@@ -1,0 +1,29 @@
+[package]
+name = "cargo-vita"
+version = "0.1.0"
+edition = "2021"
+description = "Cargo wrapper for developing Sony PlayStation Vita homebrew apps"
+repository = "https://github.com/vita-rust/cargo-vita"
+license = "MIT OR Apache-2.0"
+
+authors = ["vita-sdk", "Nikolay Arhipov <n@arhipov.net>"]
+keywords = ["vita", "homebrew"]
+categories = ["command-line-utilities", "development-tools::cargo-plugins"]
+exclude = [".github", ".vscode"]
+
+[dependencies]
+cargo_metadata = "0.17.0"
+clap = { version = "4.4.2", features = ["derive"] }
+ftp = "3.0.1"
+rustc_version = "0.4.0"
+serde = { version = "1.0.188", features = ["derive"] }
+serde_json = "1.0.105"
+toml = "0.7.8"
+walkdir = "2.4.0"
+
+[patch.crates-io]
+cargo_metadata = { git = "https://github.com/oli-obk/cargo_metadata.git", rev = "fd72a0be532c178e2acd440cb4d7174a6c24803e" }
+
+[package.metadata.vita]
+title_id = "VITASHELL"
+title_name = "Test app"
