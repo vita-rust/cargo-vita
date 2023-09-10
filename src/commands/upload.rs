@@ -1,10 +1,10 @@
 use std::{fs::File, io::BufReader, ops::Deref, path::Path};
 
-use cargo_metadata::MetadataCommand;
 use clap::Args;
+use colored::Colorize;
 use ftp::FtpStream;
 
-use super::ConnectionArgs;
+use super::{ConnectionArgs, Executor};
 
 #[derive(Args, Debug)]
 pub struct Upload {
@@ -20,22 +20,21 @@ pub struct Upload {
     destination: String,
 }
 
-impl Upload {
-    pub fn execute(&self, verbose: u8) {
+impl Executor for Upload {
+    fn execute(&self, verbose: u8) {
         let source = Path::new(&self.source);
         if !source.exists() {
             panic!("Source path does not exist");
         }
 
-        let ip = self.connection.get_vita_ip();
-
+        let ip = &self.connection.vita_ip;
         if verbose > 0 {
             println!("Connecting to {ip}:{}", self.connection.ftp_port);
         }
 
         let mut ftp = FtpStream::connect((ip.deref(), self.connection.ftp_port)).unwrap();
 
-        let destination = if self.destination.chars().last() == Some('/') {
+        let destination = if self.destination.ends_with('/') {
             format!(
                 "{}{}",
                 self.destination,
@@ -91,9 +90,6 @@ impl Upload {
                             return;
                         }
 
-                        // let _ = ftp.quit();
-                        // ftp = FtpStream::connect((ip.deref(), self.connection.ftp_port)).unwrap();
-
                         // For some reason doing multiple cwd in a single connection breaks vitacompanion,
                         // So we'll skip directory creation errors.
                         if ftp.cwd(&destination).is_err() {
@@ -103,10 +99,13 @@ impl Upload {
                             match ftp.mkdir(&destination) {
                                 Ok(_) => {}
                                 Err(ftp::FtpError::InvalidResponse(e))
-                                    if e == "226 Directory created." => {}
+                                    if e.starts_with("226 Directory created.") => {}
                                 Err(e) => {
-                                    if verbose > 0 {
-                                        println!("Unable to create directory: {destination}, {e}");
+                                    if verbose > 1 {
+                                        println!(
+                                            "{} {destination}, {e}",
+                                            "Unable to create directory: ".red()
+                                        );
                                     }
                                 }
                             };

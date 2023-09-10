@@ -1,8 +1,8 @@
 use clap::Args;
 
-use crate::nc;
+use crate::nc::nc;
 
-use super::ConnectionArgs;
+use super::{ConnectionArgs, Executor};
 
 #[derive(Args, Debug)]
 pub struct Reboot {
@@ -10,9 +10,10 @@ pub struct Reboot {
     connection: ConnectionArgs,
 }
 
-impl Reboot {
-    pub fn execute(&self, verbose: u8) {
-        let ip = self.connection.get_vita_ip();
-        nc::nc(verbose, &ip, self.connection.cmd_port, "reboot");
+impl Executor for Reboot {
+    fn execute(&self, verbose: u8) {
+        let ip = &self.connection.vita_ip;
+        let port = self.connection.cmd_port;
+        nc(verbose, ip, port, "reboot");
     }
 }

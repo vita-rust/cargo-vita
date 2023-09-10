@@ -2,14 +2,16 @@ use std::{io::Read, net::TcpListener};
 
 use clap::Args;
 
+use super::Executor;
+
 #[derive(Args, Debug)]
 pub struct Logs {
-    #[arg(long, short = 'p', default_value_t = 8888)]
+    #[arg(long, short = 'p', env = "VITA_LOG_PORT", default_value_t = 8888)]
     port: u16,
 }
 
-impl Logs {
-    pub fn execute(&self, verbose: u8) {
+impl Executor for Logs {
+    fn execute(&self, verbose: u8) {
         if verbose > 0 {
             println!("Starting TCP server on port {}", self.port);
         }
