@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use cargo_metadata::MetadataCommand;
+use cargo_metadata::{Artifact, MetadataCommand, Package};
 use serde::Deserialize;
 
 pub static VITA_TARGET: &str = "armv7-sony-vita-newlibeabihf";
@@ -67,10 +67,12 @@ pub struct PackageMetadata {
     #[serde(default = "default_build_std")]
     pub build_std: String,
     pub vita_sdk: Option<String>,
-    #[serde(default = "default_vita_make_fself_flags")]
+    #[serde(default = "default_vita_strip_flags")]
     pub vita_strip_flags: Vec<String>,
-    #[serde(default = "default_vita_mksfoex_flags")]
+    #[serde(default = "default_vita_make_fself_flags")]
     pub vita_make_fself_flags: Vec<String>,
+    #[serde(default = "default_vita_mksfoex_flags")]
+    pub vita_mksfoex_flags: Vec<String>,
 }
 
 impl Default for PackageMetadata {
@@ -83,25 +85,35 @@ impl Default for PackageMetadata {
             vita_sdk: Default::default(),
             vita_strip_flags: default_vita_strip_flags(),
             vita_make_fself_flags: default_vita_make_fself_flags(),
+            vita_mksfoex_flags: default_vita_mksfoex_flags(),
         }
     }
 }
 
-pub fn parse_crate_metadata() -> PackageMetadata {
+pub fn parse_crate_metadata(artifact: Option<&Artifact>) -> (PackageMetadata, Option<Package>) {
     let meta = MetadataCommand::new()
         .exec()
         .expect("Failed to get cargo metadata");
 
-    if let Some(pkg) = meta.workspace_default_packages().first() {
+    let pkg = match artifact {
+        Some(artifact) => meta
+            .packages
+            .iter()
+            .filter(|p| p.id == artifact.package_id)
+            .next(),
+        None => meta.workspace_default_packages().first().cloned(),
+    };
+
+    if let Some(pkg) = pkg {
         if let Some(metadata) = pkg.metadata.as_object() {
             if let Some(metadata) = metadata.get("vita") {
                 let metadata = serde_json::from_value::<PackageMetadata>(metadata.clone())
                     .expect("Unable to deserialize `package.metadata.vita`");
 
-                return metadata;
+                return (metadata, Some(pkg.clone()));
             }
         }
     }
 
-    Default::default()
+    (Default::default(), pkg.cloned())
 }

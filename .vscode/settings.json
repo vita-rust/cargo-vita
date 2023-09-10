@@ -2,6 +2,8 @@
     "cSpell.words": [
         "eabi",
         "eboot",
+        "fself",
+        "mksfoex",
         "rustc",
         "RUSTFLAGS",
         "velf",

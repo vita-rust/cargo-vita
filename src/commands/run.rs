@@ -15,7 +15,7 @@ pub struct Run {
 
 impl Executor for Run {
     fn execute(&self, verbose: u8) {
-        let title_id = self.title_id.clone().or_else(|| parse_crate_metadata().title_id)
+        let title_id = self.title_id.clone().or_else(|| parse_crate_metadata(None).0.title_id)
             .expect("Title id must either be provided by a flag or set in the `package.metadata.vita.title_id` field of your Cargo.toml");
 
         let ip = &self.connection.vita_ip;
