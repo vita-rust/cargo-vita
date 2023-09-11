@@ -20,6 +20,12 @@ use crate::meta::{parse_crate_metadata, PackageMetadata, TitleId, VITA_TARGET};
 use super::{ConnectionArgs, Executor, OptionalConnectionArgs, Run};
 
 #[derive(Args, Debug)]
+pub struct Test {
+    #[command(flatten)]
+    build: Build,
+}
+
+#[derive(Args, Debug)]
 pub struct Build {
     #[command(subcommand)]
     cmd: BuildCmd,
@@ -37,6 +43,18 @@ pub struct Build {
     #[arg(global = true)]
     #[arg(name = "CARGO_ARGS")]
     build_args: Vec<String>,
+}
+
+impl Executor for Build {
+    fn execute(&self, verbose: u8) -> anyhow::Result<()> {
+        BuildContext::new(self, verbose)?.build(CargoCommand::Build)
+    }
+}
+
+impl Executor for Test {
+    fn execute(&self, verbose: u8) -> anyhow::Result<()> {
+        BuildContext::new(&self.build, verbose)?.build(CargoCommand::Test)
+    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -72,6 +90,47 @@ struct Vpk {
     destination: String,
 }
 
+struct ExecutableArtifact {
+    meta: PackageMetadata,
+    package: Package,
+
+    elf: Utf8PathBuf,
+}
+
+impl ExecutableArtifact {
+    fn new(artifact: Artifact) -> anyhow::Result<Self> {
+        let (meta, package) = parse_crate_metadata(Some(&artifact))?;
+        let package = package.context("artifact does not have a package")?;
+
+        let executable = artifact
+            .executable
+            .as_deref()
+            .context("Artifact has no executables")?
+            .to_owned();
+
+        Ok(Self {
+            meta,
+            package,
+            elf: executable,
+        })
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CargoCommand {
+    Build,
+    Test,
+}
+
+impl CargoCommand {
+    fn command(self) -> &'static str {
+        match self {
+            Self::Build => "build",
+            Self::Test => "test",
+        }
+    }
+}
+
 struct BuildContext<'a> {
     command: &'a Build,
     sdk: String,
@@ -100,50 +159,21 @@ impl<'a> BuildContext<'a> {
         let sdk = Path::new(&self.sdk);
         sdk.join("bin").join(binary)
     }
-}
 
-struct ExecutableArtifact {
-    meta: PackageMetadata,
-    package: Package,
-
-    elf: Utf8PathBuf,
-}
-
-impl ExecutableArtifact {
-    fn new(artifact: Artifact) -> anyhow::Result<Self> {
-        let (meta, package) = parse_crate_metadata(Some(&artifact))?;
-        let package = package.context("artifact does not have a package")?;
-
-        let executable = artifact
-            .executable
-            .as_deref()
-            .context("Artifact has no executables")?
-            .to_owned();
-
-        Ok(Self {
-            meta,
-            package,
-            elf: executable,
-        })
-    }
-}
-
-impl Executor for Build {
-    fn execute(&self, verbose: u8) -> anyhow::Result<()> {
-        let ctx = BuildContext::new(self, verbose)?;
-
-        match &self.cmd {
+    fn build(&self, target: CargoCommand) -> anyhow::Result<()> {
+        let ctx = self;
+        match &ctx.command.cmd {
             BuildCmd::Elf => {
-                ctx.build_elf()?;
+                ctx.build_elf(target)?;
             }
             BuildCmd::Velf => {
-                for art in ctx.build_elf()? {
+                for art in ctx.build_elf(target)? {
                     ctx.strip(&art)?;
                     ctx.velf(&art)?;
                 }
             }
             BuildCmd::Eboot(args) => {
-                let artifacts = ctx.build_elf()?;
+                let artifacts = ctx.build_elf(target)?;
 
                 for art in &artifacts {
                     ctx.strip(art)?;
@@ -161,12 +191,12 @@ impl Executor for Build {
                 }
             }
             BuildCmd::Sfo => {
-                for art in ctx.build_elf()? {
+                for art in ctx.build_elf(target)? {
                     ctx.sfo(&art)?;
                 }
             }
             BuildCmd::Vpk(args) => {
-                let artifacts = ctx.build_elf()?;
+                let artifacts = ctx.build_elf(target)?;
 
                 for art in &artifacts {
                     ctx.strip(art)?;
@@ -198,10 +228,8 @@ impl Executor for Build {
 
         Ok(())
     }
-}
 
-impl<'a> BuildContext<'a> {
-    fn build_elf(&self) -> anyhow::Result<Vec<ExecutableArtifact>> {
+    fn build_elf(&self, target: CargoCommand) -> anyhow::Result<Vec<ExecutableArtifact>> {
         let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
 
         let rust_flags = env::var("RUSTFLAGS").unwrap_or_default()
@@ -223,13 +251,19 @@ impl<'a> BuildContext<'a> {
             .env("TARGET_CC", "arm-vita-eabi-gcc")
             .env("TARGET_CXX", "arm-vita-eabi-g++")
             .env("VITASDK", &self.sdk)
-            .arg("build")
+            .arg(target.command())
             .arg("-Z")
             .arg(format!("build-std={}", meta.build_std))
             .arg("--target")
             .arg(VITA_TARGET)
             .arg("--message-format")
-            .arg("json-render-diagnostics")
+            .arg("json-render-diagnostics");
+
+        if target == CargoCommand::Test {
+            command.arg("--no-run");
+        }
+
+        command
             .args(&self.command.build_args)
             .stdout(Stdio::piped())
             .stdin(Stdio::inherit())

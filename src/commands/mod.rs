@@ -46,8 +46,10 @@ pub struct Input {
 #[derive(Subcommand, Debug)]
 #[command(allow_external_subcommands = true)]
 pub enum CargoCmd {
-    /// Builds the Rust binary/tests/examples into a VPK or any of the intermediate steps.
+    /// Builds binary/tests/examples into a VPK or any of the intermediate steps.
     Build(Build),
+    /// Builds tests into a VPK or any of the intermediate steps.
+    Test(Test),
     /// Uploads files and directories to the Vita vita ftp.
     Upload(Upload),
     /// Starts an installed title on the Vita by the title id.
