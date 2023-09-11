@@ -2,6 +2,15 @@
 
 Cargo command to work with Sony PlayStation Vita rust project binaries.
 
+For general guidelines see [vita-rust wiki](https://github.com/vita-rust/std-newlib/wiki)
+
+## Requirements
+
+- [VitaSDK](https://vitasdk.org/) must be installed, and `VITASDK` environment variable must point to its location.
+- [vitacompanion](https://github.com/devnoname120/vitacompanion) for ftp and command server (uploading and running artifacts)
+- [PrincessLog](https://github.com/CelesteBlue-dev/PSVita-RE-tools/tree/master/PrincessLog/build) is required for `cargo vita logs`
+- [vita-parse-core](https://github.com/xyzz/vita-parse-core) for `cargo vita coredump parse`
+
 ## Usage
 
 Use the nightly toolchain to build Vita apps (either by using rustup override nightly for the project directory or by adding +nightly in the cargo invocation).
