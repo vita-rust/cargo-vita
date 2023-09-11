@@ -1,0 +1,159 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+**'
+  pull_request:
+
+env:
+  RUSTFLAGS: -D warnings
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - stable-x86_64-pc-windows-msvc
+          - stable-x86_64-apple-darwin
+          - stable-x86_64-unknown-linux-gnu
+          - beta-x86_64-unknown-linux-gnu
+          - nightly-x86_64-unknown-linux-gnu
+        include:
+          - toolchain: stable-x86_64-pc-windows-msvc
+            toolchain_nightly: nightly-2023-04-01-x86_64-pc-windows-msvc
+            os: windows-latest
+          - toolchain: stable-x86_64-apple-darwin
+            toolchain_nightly: nightly-2023-04-01-x86_64-apple-darwin
+            os: macos-latest
+          - toolchain: stable-x86_64-unknown-linux-gnu
+            toolchain_nightly: nightly-2023-04-01-x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - toolchain: beta-x86_64-unknown-linux-gnu
+            toolchain_nightly: nightly-2023-04-01-x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - toolchain: nightly-x86_64-unknown-linux-gnu
+            toolchain_nightly: nightly-2023-04-01-x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+
+    name: ${{ matrix.toolchain }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: rust-toolchain ( ${{ matrix.toolchain_nightly }} )
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ matrix.toolchain_nightly }}
+
+      - name: rust-toolchain ( ${{ matrix.toolchain }} )
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ matrix.toolchain }}
+
+      - name: '`cargo test`'
+        run: cargo test --no-fail-fast --verbose --locked
+
+      # `locked`, `dev-deps`
+      - name: '`cargo build`'
+        run: cargo build --verbose --locked
+
+      # `locked`, `avoid-dev-deps`
+      - name: '`cargo install --debug --locked`'
+        run: cargo install --path . --debug --verbose --locked
+
+      # `update`, `avoid-dev-deps`
+      - name: '`cargo install --debug`'
+        run: cargo install --path . --debug --verbose
+
+  release:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            args: "--features vendored-openssl,vendored-libgit2"
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-20.04
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-20.04
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-20.04
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-20.04
+
+    name: GitHub Release (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: rust-toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+          default: true
+
+      - name: '`cargo build --release`'
+        run: cargo build --release --target ${{ matrix.target }} ${{ matrix.args }}
+
+      - name: Create an asset
+        id: asset
+        run: |
+          if ${{ contains(matrix.target, 'pc-windows') }}; then
+            EXE=.exe
+          fi
+          EXECUTABLE="./target/${{ matrix.target }}/release/${GITHUB_REPOSITORY#*/}$EXE"
+          ASSET_STEM="${GITHUB_REPOSITORY#*/}-${GITHUB_REF#refs/tags/}-${{ matrix.target }}"
+          git archive -o "./$ASSET_STEM.tar" --prefix "$ASSET_STEM/" HEAD
+          tar -xf "./$ASSET_STEM.tar"
+          mv "$EXECUTABLE" "./$ASSET_STEM/"
+          if ${{ contains(matrix.target, 'pc-windows') }}; then
+            ASSET="./$ASSET_STEM.zip"
+            7z a "$ASSET" "./$ASSET_STEM"
+            zipinfo "$ASSET"
+          else
+            ASSET="./$ASSET_STEM.tar.gz"
+            tar -czvf "$ASSET" "./$ASSET_STEM"
+          fi
+          echo "asset=$ASSET" >> $GITHUB_OUTPUT
+        shell: bash
+
+
+      - name: GH Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.asset.outputs.asset }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: rust-toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: publish
+        run: cargo publish --token ${CRATES_TOKEN}
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
