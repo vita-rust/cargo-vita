@@ -25,7 +25,7 @@ pub struct Build {
     cmd: BuildCmd,
 
     /// An alphanumeric string of 9 characters. Used as a fallback in case title_id is not defined in Cargo.toml.
-    #[arg(long, value_parser = clap::value_parser!(TitleId))]
+    #[arg(long, env="VITA_DEFAULT_TITLE_ID", value_parser = clap::value_parser!(TitleId))]
     default_title_id: Option<TitleId>,
 
     /// Pass additional options through to the `cargo` command.
