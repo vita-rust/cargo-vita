@@ -1,3 +1,4 @@
+use anyhow::Context;
 use clap::{Args, Parser, Subcommand};
 use enum_dispatch::enum_dispatch;
 
@@ -82,6 +83,29 @@ pub struct ConnectionArgs {
     pub ftp_port: u16,
     #[arg(long, short = 'c', env = "VITA_CMD_PORT", default_value_t = 1338)]
     pub cmd_port: u16,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct OptionalConnectionArgs {
+    /// An IPv4 address of your Vita.
+    #[arg(long, short = 'a', env = "VITA_IP")]
+    pub vita_ip: Option<String>,
+    #[arg(long, short = 'f', env = "VITA_FTP_PORT", default_value_t = 1337)]
+    pub ftp_port: u16,
+    #[arg(long, short = 'c', env = "VITA_CMD_PORT", default_value_t = 1338)]
+    pub cmd_port: u16,
+}
+
+impl OptionalConnectionArgs {
+    pub fn required(self) -> anyhow::Result<ConnectionArgs> {
+        Ok(ConnectionArgs {
+            vita_ip: self.vita_ip.context(
+                "You must provide vita_ip with ar argument or VITA_IP environment variable",
+            )?,
+            ftp_port: self.ftp_port,
+            cmd_port: self.cmd_port,
+        })
+    }
 }
 
 #[derive(Args, Debug, Clone)]

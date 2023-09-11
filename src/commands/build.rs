@@ -17,7 +17,7 @@ use walkdir::WalkDir;
 
 use crate::meta::{parse_crate_metadata, PackageMetadata, TitleId, VITA_TARGET};
 
-use super::{ConnectionArgs, Executor, Run};
+use super::{ConnectionArgs, Executor, OptionalConnectionArgs, Run};
 
 #[derive(Args, Debug)]
 pub struct Build {
@@ -52,7 +52,7 @@ struct Eboot {
     #[arg(long, default_value = "false")]
     run: bool,
     #[command(flatten)]
-    connection: ConnectionArgs,
+    connection: OptionalConnectionArgs,
 }
 
 #[derive(Args, Debug)]
@@ -148,11 +148,11 @@ impl Executor for Build {
 
                 if args.update {
                     let files = ctx.eboot_uploads(&artifacts)?;
-                    ctx.upload(&files, &args.connection)?;
+                    ctx.upload(&files, &args.connection.clone().required()?)?;
                 }
 
                 if args.run {
-                    ctx.run(&artifacts, &args.connection)?;
+                    ctx.run(&artifacts, &args.connection.clone().required()?)?;
                 }
             }
             BuildCmd::Sfo => {
@@ -181,10 +181,12 @@ impl Executor for Build {
                     upload_files.extend(ctx.eboot_uploads(&artifacts)?);
                 }
 
-                ctx.upload(&upload_files, &args.eboot.connection)?;
+                if !upload_files.is_empty() {
+                    ctx.upload(&upload_files, &args.eboot.connection.clone().required()?)?;
+                }
 
                 if args.eboot.run {
-                    ctx.run(&artifacts, &args.eboot.connection)?;
+                    ctx.run(&artifacts, &args.eboot.connection.clone().required()?)?;
                 }
             }
         };
