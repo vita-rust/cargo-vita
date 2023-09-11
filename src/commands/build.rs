@@ -1,4 +1,3 @@
-use core::panic;
 use std::{
     env,
     fs::File,
@@ -8,7 +7,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use cargo_metadata::{camino::Utf8PathBuf, Artifact, Message, Package};
 use clap::{Args, Subcommand};
 use colored::Colorize;
@@ -78,20 +77,20 @@ struct BuildContext<'a> {
 }
 
 impl<'a> BuildContext<'a> {
-    pub fn new(command: &'a Build, verbose: u8) -> Self {
+    pub fn new(command: &'a Build, verbose: u8) -> anyhow::Result<Self> {
         let sdk = std::env::var("VITASDK");
-        let sdk = sdk.unwrap_or_else(|_| {
-            panic!(
+        let sdk = sdk.or_else(|_| {
+            bail!(
                 "VITASDK environment variable isn't set. Please install the SDK \
                     from https://vitasdk.org/ and set the VITASDK environment variable."
             )
-        });
+        })?;
 
-        Self {
+        Ok(Self {
             command,
             sdk,
             verbose,
-        }
+        })
     }
 
     fn sdk_binary(&self, binary: &str) -> PathBuf {
@@ -101,7 +100,6 @@ impl<'a> BuildContext<'a> {
 }
 
 struct ExecutableArtifact {
-    _artifact: Artifact,
     meta: PackageMetadata,
     package: Package,
 
@@ -120,7 +118,6 @@ impl ExecutableArtifact {
             .to_owned();
 
         Ok(Self {
-            _artifact: artifact,
             meta,
             package,
             elf: executable,
@@ -130,7 +127,7 @@ impl ExecutableArtifact {
 
 impl Executor for Build {
     fn execute(&self, verbose: u8) -> anyhow::Result<()> {
-        let ctx = BuildContext::new(self, verbose);
+        let ctx = BuildContext::new(self, verbose)?;
 
         match &self.cmd {
             BuildCmd::Elf => {
@@ -151,54 +148,13 @@ impl Executor for Build {
                     ctx.eboot(art)?;
                 }
 
-                if !artifacts.is_empty() && args.update {
-                    let ip = args.connection.vita_ip.deref();
-                    let port = args.connection.ftp_port;
-
-                    if verbose > 0 {
-                        println!("{} {ip}:{port}", "Connecting to Vita FTP server:".blue())
-                    }
-
-                    let mut ftp = FtpStream::connect((ip, port))
-                        .context("Unable to connect to Vita FTP server")?;
-
-                    let files = artifacts
-                        .iter()
-                        .map(|a| (&a.meta.title_id, a.elf.with_extension("self")));
-
-                    for (title_id, eboot) in files {
-                        let title_id = title_id
-                            .as_ref()
-                            .or(self.default_title_id.as_ref())
-                            .context("No title_id provided for artifact")?;
-                        let dest = format!("ux0:/app/{title_id}/eboot.bin");
-
-                        if verbose > 0 {
-                            println!("{} {eboot} {} {dest}", "Uploading file".blue(), "to".blue())
-                        }
-
-                        let source = File::open(eboot).context("Unable to open source file")?;
-                        ftp.put(&dest, &mut BufReader::new(source))
-                            .context("Failed to upload file")?;
-                    }
+                if args.update {
+                    let files = ctx.eboot_uploads(&artifacts)?;
+                    ctx.upload(&files, &args.connection)?;
                 }
 
                 if args.run {
-                    if let Some(art) = artifacts.last() {
-                        let title_id = art
-                            .meta
-                            .title_id
-                            .as_ref()
-                            .or(self.default_title_id.as_ref());
-
-                        if let Some(title_id) = title_id {
-                            Run {
-                                title_id: Some(title_id.clone()),
-                                connection: args.connection.clone(),
-                            }
-                            .execute(verbose)?;
-                        }
-                    }
+                    ctx.run(&artifacts, &args.connection)?;
                 }
             }
             BuildCmd::Sfo => {
@@ -206,13 +162,31 @@ impl Executor for Build {
                     ctx.sfo(&art)?;
                 }
             }
-            BuildCmd::Vpk(_args) => {
-                for art in ctx.build_elf()? {
+            BuildCmd::Vpk(args) => {
+                let artifacts = ctx.build_elf()?;
+
+                for art in &artifacts {
                     ctx.strip(&art)?;
                     ctx.velf(&art)?;
                     ctx.eboot(&art)?;
                     ctx.sfo(&art)?;
                     ctx.vpk(&art)?;
+                }
+
+                let mut upload_files = Vec::new();
+
+                if args.upload {
+                    upload_files.extend(ctx.vpk_uploads(&artifacts, &args.destination)?);
+                }
+
+                if args.eboot.update {
+                    upload_files.extend(ctx.eboot_uploads(&artifacts)?);
+                }
+
+                ctx.upload(&upload_files, &args.eboot.connection)?;
+
+                if args.eboot.run {
+                    ctx.run(&artifacts, &args.eboot.connection)?;
                 }
             }
         };
@@ -421,6 +395,92 @@ impl<'a> BuildContext<'a> {
         }
 
         command.status().context("vita-mksfoex failed")?;
+        Ok(())
+    }
+
+    fn vpk_uploads(
+        &self,
+        artifacts: &[ExecutableArtifact],
+        destination: &str,
+    ) -> anyhow::Result<Vec<(Utf8PathBuf, String)>> {
+        artifacts
+            .iter()
+            .map(|a| {
+                let src = a.elf.with_extension("vpk");
+                let dest = format!("{destination}/{}", src.file_name().unwrap_or_default());
+
+                Ok((src, dest))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()
+    }
+
+    fn eboot_uploads(
+        &self,
+        artifacts: &[ExecutableArtifact],
+    ) -> anyhow::Result<Vec<(Utf8PathBuf, String)>> {
+        artifacts
+            .iter()
+            .map(|a| {
+                let title_id = a
+                    .meta
+                    .title_id
+                    .as_ref()
+                    .or(self.command.default_title_id.as_ref())
+                    .context("No title_id provided for artifact")?;
+
+                Ok((
+                    a.elf.with_extension("self"),
+                    format!("ux0:/app/{title_id}/eboot.bin"),
+                ))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()
+    }
+
+    fn upload(&self, files: &[(Utf8PathBuf, String)], conn: &ConnectionArgs) -> anyhow::Result<()> {
+        if files.is_empty() {
+            return Ok(());
+        }
+
+        let ip = conn.vita_ip.deref();
+        let port = conn.ftp_port;
+
+        if self.verbose > 0 {
+            println!("{} {ip}:{port}", "Connecting to Vita FTP server:".blue())
+        }
+
+        let mut ftp =
+            FtpStream::connect((ip, port)).context("Unable to connect to Vita FTP server")?;
+
+        for (src, dest) in files {
+            if self.verbose > 0 {
+                println!("{} {src} {} {dest}", "Uploading file".blue(), "to".blue())
+            }
+
+            let src = File::open(src).context("Unable to open source file")?;
+            ftp.put(&dest, &mut BufReader::new(src))
+                .context("Failed to upload file")?;
+        }
+
+        Ok(())
+    }
+
+    fn run(&self, artifacts: &[ExecutableArtifact], conn: &ConnectionArgs) -> anyhow::Result<()> {
+        if let Some(art) = artifacts.last() {
+            let title_id = art
+                .meta
+                .title_id
+                .as_ref()
+                .or(self.command.default_title_id.as_ref());
+
+            if let Some(title_id) = title_id {
+                Run {
+                    title_id: Some(title_id.clone()),
+                    connection: conn.clone(),
+                }
+                .execute(self.verbose)?;
+            }
+        }
+
         Ok(())
     }
 }
