@@ -407,7 +407,12 @@ impl<'a> BuildContext<'a> {
             .iter()
             .map(|a| {
                 let src = a.elf.with_extension("vpk");
-                let dest = format!("{destination}/{}", src.file_name().unwrap_or_default());
+
+                let separator = if destination.ends_with("/") { "" } else { "/" };
+                let dest = format!(
+                    "{destination}{separator}{}",
+                    src.file_name().unwrap_or_default()
+                );
 
                 Ok((src, dest))
             })
