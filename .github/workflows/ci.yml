@@ -5,7 +5,7 @@ on:
     branches:
       - master
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+**'
+      - "v[0-9]+.[0-9]+.[0-9]+**"
   pull_request:
 
 env:
@@ -24,19 +24,14 @@ jobs:
           - nightly-x86_64-unknown-linux-gnu
         include:
           - toolchain: stable-x86_64-pc-windows-msvc
-            toolchain_nightly: nightly-2023-04-01-x86_64-pc-windows-msvc
             os: windows-latest
           - toolchain: stable-x86_64-apple-darwin
-            toolchain_nightly: nightly-2023-04-01-x86_64-apple-darwin
             os: macos-latest
           - toolchain: stable-x86_64-unknown-linux-gnu
-            toolchain_nightly: nightly-2023-04-01-x86_64-unknown-linux-gnu
             os: ubuntu-latest
           - toolchain: beta-x86_64-unknown-linux-gnu
-            toolchain_nightly: nightly-2023-04-01-x86_64-unknown-linux-gnu
             os: ubuntu-latest
           - toolchain: nightly-x86_64-unknown-linux-gnu
-            toolchain_nightly: nightly-2023-04-01-x86_64-unknown-linux-gnu
             os: ubuntu-latest
 
     name: ${{ matrix.toolchain }}
@@ -46,30 +41,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: rust-toolchain ( ${{ matrix.toolchain_nightly }} )
-        uses: dtolnay/rust-toolchain@nightly
-        with:
-          toolchain: ${{ matrix.toolchain_nightly }}
-
       - name: rust-toolchain ( ${{ matrix.toolchain }} )
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
 
-      - name: '`cargo test`'
+      - name: "`cargo test`"
         run: cargo test --no-fail-fast --verbose --locked
-
-      # `locked`, `dev-deps`
-      - name: '`cargo build`'
-        run: cargo build --verbose --locked
-
-      # `locked`, `avoid-dev-deps`
-      - name: '`cargo install --debug --locked`'
-        run: cargo install --path . --debug --verbose --locked
-
-      # `update`, `avoid-dev-deps`
-      - name: '`cargo install --debug`'
-        run: cargo install --path . --debug --verbose
 
   release:
     strategy:
@@ -103,13 +81,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: rust-toolchain
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
-          default: true
 
-      - name: '`cargo build --release`'
+      - name: "`cargo build --release`"
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Create an asset
@@ -134,7 +111,6 @@ jobs:
           echo "asset=$ASSET" >> $GITHUB_OUTPUT
         shell: bash
 
-
       - name: GH Release
         uses: softprops/action-gh-release@v1
         with:
@@ -150,7 +126,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: rust-toolchain
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
       - name: publish
         run: cargo publish --token ${CRATES_TOKEN}
