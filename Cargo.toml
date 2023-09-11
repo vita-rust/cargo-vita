@@ -27,9 +27,6 @@ tempfile = "3.8.0"
 toml = "0.7.8"
 walkdir = "2.4.0"
 
-[patch.crates-io]
-cargo_metadata = { git = "https://github.com/oli-obk/cargo_metadata.git", rev = "fd72a0be532c178e2acd440cb4d7174a6c24803e" }
-
 [package.metadata.vita]
 title_id = "VITASHELL"
 title_name = "Test app"

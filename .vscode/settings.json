@@ -6,6 +6,7 @@
         "eboot",
         "fself",
         "mksfoex",
+        "repr",
         "rustc",
         "RUSTFLAGS",
         "velf",
