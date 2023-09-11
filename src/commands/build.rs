@@ -1,339 +1,426 @@
 use core::panic;
 use std::{
     env,
+    fs::File,
     io::{self, BufReader},
+    ops::Deref,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
-use cargo_metadata::{Artifact, Message, Package};
+use anyhow::Context;
+use cargo_metadata::{camino::Utf8PathBuf, Artifact, Message, Package};
 use clap::{Args, Subcommand};
 use colored::Colorize;
 use either::Either;
+use ftp::FtpStream;
 use tee::TeeReader;
 use walkdir::WalkDir;
 
 use crate::meta::{parse_crate_metadata, PackageMetadata, TitleId, VITA_TARGET};
 
-use super::Executor;
+use super::{ConnectionArgs, Executor, Run};
 
 #[derive(Args, Debug)]
 pub struct Build {
     #[command(subcommand)]
     cmd: BuildCmd,
 
+    /// An alphanumeric string of 9 characters. Used as a fallback in case title_id is not defined in Cargo.toml.
+    #[arg(long, value_parser = clap::value_parser!(TitleId))]
+    default_title_id: Option<TitleId>,
+
     #[arg(trailing_var_arg = true)]
     #[arg(allow_hyphen_values = true)]
     #[arg(global = true)]
     #[arg(name = "CARGO_ARGS")]
-    args: Vec<String>,
+    build_args: Vec<String>,
 }
 #[derive(Subcommand, Debug)]
 #[command(allow_external_subcommands = true)]
 enum BuildCmd {
     Elf,
     Velf,
-    Eboot,
-    Sfo(Sfo),
+    Eboot(Eboot),
+    Sfo,
     Vpk(Vpk),
 }
 
 #[derive(Args, Debug)]
-struct Sfo {
-    /// An alphanumeric string of 9 characters. Used as a fallback in case title_id is not defined in Cargo.toml.
-    #[arg(long, value_parser = clap::value_parser!(TitleId))]
-    default_title_id: Option<TitleId>,
+struct Eboot {
+    /// Uploads eboot.bin to ux0:app/{title_id}/eboot.bin
+    #[arg(long, default_value = "false")]
+    update: bool,
+    /// Runs the updated app. If multiple eboot files are updated, only the last one is run.
+    #[arg(long, default_value = "false")]
+    run: bool,
+    #[command(flatten)]
+    connection: ConnectionArgs,
 }
 
 #[derive(Args, Debug)]
 struct Vpk {
     #[command(flatten)]
-    sfo: Sfo,
+    eboot: Eboot,
+    /// Uploads the vpk files to the destination folder
+    #[arg(long, default_value = "false")]
+    upload: bool,
+    /// A directory on Vita where a file will be saved. Slash in the end indicates that it's a directory.
+    #[arg(long, short = 'd', default_value = "ux0:/download/")]
+    destination: String,
 }
 
-impl Executor for Build {
-    fn execute(&self, verbose: u8) {
-        let (meta, _) = parse_crate_metadata(None);
-        let sdk = std::env::var("VITASDK");
-        let sdk = meta
-            .vita_sdk
-            .as_deref()
-            .or_else(|| sdk.as_deref().ok())
-            .unwrap_or_else(|| {
-                panic!(
-                    "VITASDK environment variable isn't set. Please install the SDK \
-                    from https://vitasdk.org/ and set the VITASDK environment variable."
-                )
-            });
+struct BuildContext<'a> {
+    command: &'a Build,
+    sdk: String,
 
-        match &self.cmd {
-            BuildCmd::Elf => {
-                build_elf(&meta, sdk, &self.args, verbose);
-            }
-            BuildCmd::Velf => {
-                for artifact in build_elf(&meta, sdk, &self.args, verbose) {
-                    let (meta, _) = parse_crate_metadata(Some(&artifact));
-
-                    strip(&artifact, sdk, &meta, verbose);
-                    velf(&artifact, sdk, &meta, verbose);
-                }
-            }
-            BuildCmd::Eboot => {
-                for artifact in build_elf(&meta, sdk, &self.args, verbose) {
-                    let (meta, _) = parse_crate_metadata(Some(&artifact));
-
-                    strip(&artifact, sdk, &meta, verbose);
-                    velf(&artifact, sdk, &meta, verbose);
-                    eboot(&artifact, sdk, &meta, verbose);
-                }
-            }
-            BuildCmd::Sfo(args) => {
-                for artifact in build_elf(&meta, sdk, &self.args, verbose) {
-                    let (meta, pkg) = parse_crate_metadata(Some(&artifact));
-                    let pkg = pkg.expect("artifact does not have a package");
-
-                    sfo(&args, &artifact, sdk, &meta, &pkg, verbose);
-                }
-            }
-            BuildCmd::Vpk(args) => {
-                for artifact in build_elf(&meta, sdk, &self.args, verbose) {
-                    let (meta, pkg) = parse_crate_metadata(Some(&artifact));
-                    let pkg = pkg.expect("artifact does not have a package");
-
-                    strip(&artifact, sdk, &meta, verbose);
-                    velf(&artifact, sdk, &meta, verbose);
-                    eboot(&artifact, sdk, &meta, verbose);
-                    sfo(&args.sfo, &artifact, sdk, &meta, &pkg, verbose);
-                    vpk(&artifact, sdk, &meta, verbose);
-                }
-            }
-        };
-    }
-}
-
-fn build_elf(meta: &PackageMetadata, sdk: &str, args: &[String], verbose: u8) -> Vec<Artifact> {
-    let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
-
-    let rust_flags = env::var("RUSTFLAGS").unwrap_or_default()
-        + " --cfg mio_unsupported_force_poll_poll --cfg mio_unsupported_force_waker_pipe";
-
-    let mut command = Command::new(cargo);
-
-    if let Ok(path) = env::var("PATH") {
-        let sdk_path = Path::new(sdk).join("bin");
-        let path = format!("{}:{path}", sdk_path.display());
-        command.env("PATH", path);
-    }
-
-    command
-        .env("RUSTFLAGS", rust_flags)
-        .env("TARGET_CC", "arm-vita-eabi-gcc")
-        .env("TARGET_CXX", "arm-vita-eabi-g++")
-        .env("VITASDK", sdk)
-        .arg("build")
-        .arg("-Z")
-        .arg(format!("build-std={}", meta.build_std))
-        .arg("--target")
-        .arg(VITA_TARGET)
-        .arg("--message-format")
-        .arg("json-render-diagnostics")
-        .args(args)
-        .stdout(Stdio::piped())
-        .stdin(Stdio::inherit())
-        .stderr(Stdio::inherit());
-
-    if verbose > 0 {
-        println!("{} {command:?}", "Running cargo:".blue());
-    }
-
-    let mut process = command.spawn().unwrap();
-    let command_stdout = process.stdout.take().unwrap();
-
-    let reader = if verbose > 1 {
-        Either::Left(BufReader::new(TeeReader::new(command_stdout, io::stdout())))
-    } else {
-        Either::Right(BufReader::new(command_stdout))
-    };
-
-    let messages: Vec<Message> = Message::parse_stream(reader)
-        .collect::<io::Result<_>>()
-        .unwrap();
-
-    messages
-        .iter()
-        .rev()
-        .filter_map(|m| match m {
-            Message::CompilerArtifact(art) if art.executable.is_some() => Some(art.clone()),
-            _ => None,
-        })
-        .collect()
-}
-
-fn strip(artifact: &Artifact, sdk: &str, meta: &PackageMetadata, verbose: u8) {
-    let sdk = Path::new(sdk);
-    let mut command = Command::new(sdk.join("bin").join("arm-vita-eabi-strip").as_os_str());
-
-    command
-        .args(&meta.vita_strip_flags)
-        .arg(
-            artifact
-                .executable
-                .as_deref()
-                .expect("Artifact has no executables"),
-        )
-        .stdout(Stdio::piped())
-        .stdin(Stdio::inherit())
-        .stderr(Stdio::inherit());
-
-    if verbose > 0 {
-        println!("{} {command:?}", "Stripping elf:".blue());
-    }
-
-    command.status().expect("Artifact has no executables");
-}
-
-fn velf(artifact: &Artifact, sdk: &str, _meta: &PackageMetadata, verbose: u8) {
-    let sdk = Path::new(sdk);
-    let mut command = Command::new(sdk.join("bin").join("vita-elf-create").as_os_str());
-    let elf = artifact
-        .executable
-        .as_deref()
-        .expect("Artifact has no executables");
-
-    let mut velf = PathBuf::from(&elf);
-    velf.set_extension("velf");
-
-    command
-        .arg(elf)
-        .arg(&velf)
-        .stdout(Stdio::piped())
-        .stdin(Stdio::inherit())
-        .stderr(Stdio::inherit());
-
-    if verbose > 0 {
-        println!("{} {command:?}", "Creating velf:".blue());
-    }
-
-    command.status().expect("vita-elf-create failed");
-}
-
-fn eboot(artifact: &Artifact, sdk: &str, meta: &PackageMetadata, verbose: u8) {
-    let sdk = Path::new(sdk);
-    let mut command = Command::new(sdk.join("bin").join("vita-make-fself").as_os_str());
-    let elf = artifact
-        .executable
-        .as_deref()
-        .expect("Artifact has no executables");
-
-    let mut velf = PathBuf::from(&elf);
-    velf.set_extension("velf");
-
-    let mut eboot = PathBuf::from(&elf);
-    eboot.set_extension("self");
-
-    command
-        .args(&meta.vita_make_fself_flags)
-        .arg(&velf)
-        .arg(&eboot)
-        .stdout(Stdio::piped())
-        .stdin(Stdio::inherit())
-        .stderr(Stdio::inherit());
-
-    if verbose > 0 {
-        println!("{} {command:?}", "Creating eboot:".blue());
-    }
-
-    command.status().expect("vita-make-fself failed");
-}
-
-fn sfo(
-    args: &Sfo,
-    artifact: &Artifact,
-    sdk: &str,
-    meta: &PackageMetadata,
-    pkg: &Package,
     verbose: u8,
-) {
-    let sdk = Path::new(sdk);
-    let mut command = Command::new(sdk.join("bin").join("vita-mksfoex").as_os_str());
-    let elf = artifact
-        .executable
-        .as_deref()
-        .expect("Artifact has no executables");
-
-    let mut sfo = PathBuf::from(&elf);
-    sfo.set_extension("sfo");
-
-    let title_name = meta.title_name.as_deref().unwrap_or_else(|| &pkg.name);
-
-    let title_id = &meta
-        .title_id
-        .as_ref()
-        .or(args.default_title_id.as_ref())
-        .expect(&format!("title_id is not set for artifact {}", pkg.name))
-        .0;
-
-    command
-        .args(&meta.vita_mksfoex_flags)
-        .arg("-s")
-        .arg(format!("TITLE_ID={title_id}"))
-        .arg(title_name)
-        .arg(sfo)
-        .stdout(Stdio::piped())
-        .stdin(Stdio::inherit())
-        .stderr(Stdio::inherit());
-
-    if verbose > 0 {
-        println!("{} {command:?}", "Creating sfo:".blue());
-    }
-
-    command.status().expect("vita-mksfoex failed");
 }
 
-fn vpk(artifact: &Artifact, sdk: &str, meta: &PackageMetadata, verbose: u8) {
-    let elf = artifact
-        .executable
-        .as_deref()
-        .expect("Artifact has no executables");
+impl<'a> BuildContext<'a> {
+    pub fn new(command: &'a Build, verbose: u8) -> Self {
+        let sdk = std::env::var("VITASDK");
+        let sdk = sdk.unwrap_or_else(|_| {
+            panic!(
+                "VITASDK environment variable isn't set. Please install the SDK \
+                    from https://vitasdk.org/ and set the VITASDK environment variable."
+            )
+        });
 
-    let mut eboot = PathBuf::from(&elf);
-    eboot.set_extension("self");
-
-    let mut vpk = PathBuf::from(&elf);
-    vpk.set_extension("vpk");
-
-    let mut sfo = PathBuf::from(&elf);
-    sfo.set_extension("sfo");
-
-    let sdk = Path::new(sdk);
-    let mut command = Command::new(sdk.join("bin").join("vita-pack-vpk").as_os_str());
-    command.arg("-s").arg(sfo);
-    command.arg("-b").arg(eboot);
-
-    if let Some(assets) = &meta.assets {
-        let files = WalkDir::new(assets)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file());
-
-        for file in files {
-            command.arg("--add").arg(format!(
-                "{}={}",
-                file.path().display(), // path on FS
-                file.path().strip_prefix(assets).unwrap().display()  // path in VPK
-            ));
+        Self {
+            command,
+            sdk,
+            verbose,
         }
     }
 
-    command
-        .arg(vpk)
-        .stdout(Stdio::piped())
-        .stdin(Stdio::inherit())
-        .stderr(Stdio::inherit());
+    fn sdk_binary(&self, binary: &str) -> PathBuf {
+        let sdk = Path::new(&self.sdk);
+        sdk.join("bin").join(binary)
+    }
+}
 
-    if verbose > 0 {
-        println!("{} {command:?}", "Building vpk:".blue());
+struct ExecutableArtifact {
+    _artifact: Artifact,
+    meta: PackageMetadata,
+    package: Package,
+
+    elf: Utf8PathBuf,
+}
+
+impl ExecutableArtifact {
+    fn new(artifact: Artifact) -> anyhow::Result<Self> {
+        let (meta, package) = parse_crate_metadata(Some(&artifact))?;
+        let package = package.context("artifact does not have a package")?;
+
+        let executable = artifact
+            .executable
+            .as_deref()
+            .context("Artifact has no executables")?
+            .to_owned();
+
+        Ok(Self {
+            _artifact: artifact,
+            meta,
+            package,
+            elf: executable,
+        })
+    }
+}
+
+impl Executor for Build {
+    fn execute(&self, verbose: u8) -> anyhow::Result<()> {
+        let ctx = BuildContext::new(self, verbose);
+
+        match &self.cmd {
+            BuildCmd::Elf => {
+                ctx.build_elf()?;
+            }
+            BuildCmd::Velf => {
+                for art in ctx.build_elf()? {
+                    ctx.strip(&art)?;
+                    ctx.velf(&art)?;
+                }
+            }
+            BuildCmd::Eboot(args) => {
+                let artifacts = ctx.build_elf()?;
+
+                for art in &artifacts {
+                    ctx.strip(art)?;
+                    ctx.velf(art)?;
+                    ctx.eboot(art)?;
+                }
+
+                if !artifacts.is_empty() && args.update {
+                    let ip = args.connection.vita_ip.deref();
+                    let port = args.connection.ftp_port;
+
+                    if verbose > 0 {
+                        println!("{} {ip}:{port}", "Connecting to Vita FTP server:".blue())
+                    }
+
+                    let mut ftp = FtpStream::connect((ip, port))
+                        .context("Unable to connect to Vita FTP server")?;
+
+                    let files = artifacts
+                        .iter()
+                        .map(|a| (&a.meta.title_id, a.elf.with_extension("self")));
+
+                    for (title_id, eboot) in files {
+                        let title_id = title_id
+                            .as_ref()
+                            .or(self.default_title_id.as_ref())
+                            .context("No title_id provided for artifact")?;
+                        let dest = format!("ux0:/app/{title_id}/eboot.bin");
+
+                        if verbose > 0 {
+                            println!("{} {eboot} {} {dest}", "Uploading file".blue(), "to".blue())
+                        }
+
+                        let source = File::open(eboot).context("Unable to open source file")?;
+                        ftp.put(&dest, &mut BufReader::new(source))
+                            .context("Failed to upload file")?;
+                    }
+                }
+
+                if args.run {
+                    if let Some(art) = artifacts.last() {
+                        let title_id = art
+                            .meta
+                            .title_id
+                            .as_ref()
+                            .or(self.default_title_id.as_ref());
+
+                        if let Some(title_id) = title_id {
+                            Run {
+                                title_id: Some(title_id.clone()),
+                                connection: args.connection.clone(),
+                            }
+                            .execute(verbose)?;
+                        }
+                    }
+                }
+            }
+            BuildCmd::Sfo => {
+                for art in ctx.build_elf()? {
+                    ctx.sfo(&art)?;
+                }
+            }
+            BuildCmd::Vpk(_args) => {
+                for art in ctx.build_elf()? {
+                    ctx.strip(&art)?;
+                    ctx.velf(&art)?;
+                    ctx.eboot(&art)?;
+                    ctx.sfo(&art)?;
+                    ctx.vpk(&art)?;
+                }
+            }
+        };
+
+        Ok(())
+    }
+}
+
+impl<'a> BuildContext<'a> {
+    fn build_elf(&self) -> anyhow::Result<Vec<ExecutableArtifact>> {
+        let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
+
+        let rust_flags = env::var("RUSTFLAGS").unwrap_or_default()
+            + " --cfg mio_unsupported_force_poll_poll --cfg mio_unsupported_force_waker_pipe";
+
+        let mut command = Command::new(cargo);
+
+        if let Ok(path) = env::var("PATH") {
+            let sdk_path = Path::new(&self.sdk).join("bin");
+            let path = format!("{}:{path}", sdk_path.display());
+            command.env("PATH", path);
+        }
+
+        // FIXME: A horrible solution, the same -Z flag will be used for all of the crates in a workspace.
+        let (meta, _) = parse_crate_metadata(None)?;
+
+        command
+            .env("RUSTFLAGS", rust_flags)
+            .env("TARGET_CC", "arm-vita-eabi-gcc")
+            .env("TARGET_CXX", "arm-vita-eabi-g++")
+            .env("VITASDK", &self.sdk)
+            .arg("build")
+            .arg("-Z")
+            .arg(format!("build-std={}", meta.build_std))
+            .arg("--target")
+            .arg(VITA_TARGET)
+            .arg("--message-format")
+            .arg("json-render-diagnostics")
+            .args(&self.command.build_args)
+            .stdout(Stdio::piped())
+            .stdin(Stdio::inherit())
+            .stderr(Stdio::inherit());
+
+        if self.verbose > 0 {
+            println!("{} {command:?}", "Running cargo:".blue());
+        }
+
+        let mut process = command.spawn().context("Unable to spawn build process")?;
+        let command_stdout = process.stdout.take().context("Build failed")?;
+
+        let reader = if self.verbose > 1 {
+            Either::Left(BufReader::new(TeeReader::new(command_stdout, io::stdout())))
+        } else {
+            Either::Right(BufReader::new(command_stdout))
+        };
+
+        let messages: Vec<Message> = Message::parse_stream(reader)
+            .collect::<io::Result<_>>()
+            .context("Unable to parse build stdout")?;
+
+        messages
+            .iter()
+            .rev()
+            .filter_map(|m| match m {
+                Message::CompilerArtifact(art) if art.executable.is_some() => Some(art.clone()),
+                _ => None,
+            })
+            .map(ExecutableArtifact::new)
+            .collect()
     }
 
-    command.status().expect("vita-mksfoex failed");
+    fn strip(&self, art: &ExecutableArtifact) -> anyhow::Result<()> {
+        let mut command = Command::new(self.sdk_binary("arm-vita-eabi-strip"));
+
+        command
+            .args(&art.meta.vita_strip_flags)
+            .arg(&art.elf)
+            .stdout(Stdio::piped())
+            .stdin(Stdio::inherit())
+            .stderr(Stdio::inherit());
+
+        if self.verbose > 0 {
+            println!("{} {command:?}", "Stripping elf:".blue());
+        }
+
+        command.status().context("Artifact has no executables")?;
+        Ok(())
+    }
+
+    fn velf(&self, art: &ExecutableArtifact) -> anyhow::Result<()> {
+        let mut command = Command::new(self.sdk_binary("vita-elf-create"));
+        let elf = &art.elf;
+        let velf = elf.with_extension("velf");
+
+        command
+            .arg(elf)
+            .arg(velf)
+            .stdout(Stdio::piped())
+            .stdin(Stdio::inherit())
+            .stderr(Stdio::inherit());
+
+        if self.verbose > 0 {
+            println!("{} {command:?}", "Creating velf:".blue());
+        }
+
+        command.status().context("vita-elf-create failed")?;
+        Ok(())
+    }
+
+    fn eboot(&self, art: &ExecutableArtifact) -> anyhow::Result<()> {
+        let mut command = Command::new(self.sdk_binary("vita-make-fself"));
+        let elf = &art.elf;
+        let velf = elf.with_extension("velf");
+        let eboot = elf.with_extension("self");
+
+        command
+            .args(&art.meta.vita_make_fself_flags)
+            .arg(&velf)
+            .arg(&eboot)
+            .stdout(Stdio::piped())
+            .stdin(Stdio::inherit())
+            .stderr(Stdio::inherit());
+
+        if self.verbose > 0 {
+            println!("{} {command:?}", "Creating eboot:".blue());
+        }
+
+        command.status().context("vita-make-fself failed")?;
+        Ok(())
+    }
+
+    fn sfo(&self, art: &ExecutableArtifact) -> anyhow::Result<()> {
+        let mut command = Command::new(self.sdk_binary("vita-mksfoex"));
+        let elf = &art.elf;
+        let sfo = elf.with_extension("sfo");
+
+        let title_name = art
+            .meta
+            .title_name
+            .as_deref()
+            .unwrap_or_else(|| &art.package.name);
+
+        let title_id = &art
+            .meta
+            .title_id
+            .as_ref()
+            .or(self.command.default_title_id.as_ref())
+            .context(format!(
+                "title_id is not set for artifact {}",
+                art.package.name
+            ))?;
+
+        command.args(&art.meta.vita_mksfoex_flags);
+        command.arg("-s").arg(format!("TITLE_ID={title_id}"));
+        command
+            .arg(title_name)
+            .arg(sfo)
+            .stdout(Stdio::piped())
+            .stdin(Stdio::inherit())
+            .stderr(Stdio::inherit());
+
+        if self.verbose > 0 {
+            println!("{} {command:?}", "Creating sfo:".blue());
+        }
+
+        command.status().context("vita-mksfoex failed")?;
+        Ok(())
+    }
+
+    fn vpk(&self, art: &ExecutableArtifact) -> anyhow::Result<()> {
+        let elf = &art.elf;
+        let vpk = elf.with_extension("vpk");
+        let eboot = elf.with_extension("self");
+        let sfo = elf.with_extension("sfo");
+
+        let mut command = Command::new(self.sdk_binary("vita-pack-vpk"));
+        command.arg("-s").arg(sfo);
+        command.arg("-b").arg(eboot);
+
+        if let Some(assets) = &art.meta.assets {
+            let files = WalkDir::new(assets)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_type().is_file());
+
+            for file in files {
+                command.arg("--add").arg(format!(
+                    "{}={}",
+                    file.path().display(), // path on FS
+                    file.path()
+                        .strip_prefix(assets)
+                        .context("Unable to strip VPK prefix")?
+                        .display()  // path in VPK
+                ));
+            }
+        }
+
+        command
+            .arg(vpk)
+            .stdout(Stdio::piped())
+            .stdin(Stdio::inherit())
+            .stderr(Stdio::inherit());
+
+        if self.verbose > 0 {
+            println!("{} {command:?}", "Building vpk:".blue());
+        }
+
+        command.status().context("vita-mksfoex failed")?;
+        Ok(())
+    }
 }

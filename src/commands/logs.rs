@@ -1,6 +1,8 @@
 use std::{io::Read, net::TcpListener};
 
+use anyhow::Context;
 use clap::Args;
+use colored::Colorize;
 
 use super::Executor;
 
@@ -11,21 +13,22 @@ pub struct Logs {
 }
 
 impl Executor for Logs {
-    fn execute(&self, verbose: u8) {
+    fn execute(&self, verbose: u8) -> anyhow::Result<()> {
         if verbose > 0 {
-            println!("Starting TCP server on port {}", self.port);
+            println!("{} {}", "Starting TCP server on port".blue(), self.port);
         }
 
         let listener =
-            TcpListener::bind(("0.0.0.0", self.port)).expect("Unable to start TCP server");
+            TcpListener::bind(("0.0.0.0", self.port)).context("Unable to start TCP server")?;
 
         for stream in listener.incoming() {
             match stream {
                 Ok(mut client) => {
                     if verbose > 1 {
                         println!(
-                            ">>> Accepted connection from: {}",
-                            client.peer_addr().expect("Unable to get peer address")
+                            "{}: {}",
+                            "Accepted connection from".blue(),
+                            client.peer_addr().context("Unable to get peer address")?
                         );
                     }
 
@@ -35,7 +38,7 @@ impl Executor for Logs {
                             match client.read(&mut buffer) {
                                 Ok(0) => {
                                     if verbose > 1 {
-                                        println!(">>> Client disconnected");
+                                        println!("{}", "Client disconnected".blue());
                                     }
                                     break;
                                 }
@@ -43,7 +46,7 @@ impl Executor for Logs {
                                     print!("{}", String::from_utf8_lossy(&buffer[..bytes_read]))
                                 }
                                 Err(e) => {
-                                    eprintln!("Error reading from client: {}", e);
+                                    eprintln!("{}: {}", "Error reading from client".red(), e);
                                     break;
                                 }
                             }
@@ -55,5 +58,7 @@ impl Executor for Logs {
                 }
             }
         }
+
+        Ok(())
     }
 }

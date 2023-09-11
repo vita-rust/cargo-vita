@@ -12,6 +12,7 @@ categories = ["command-line-utilities", "development-tools::cargo-plugins"]
 exclude = [".github", ".vscode"]
 
 [dependencies]
+anyhow = {version = "1.0.75", features = ["backtrace"] }
 cargo_metadata = "0.17.0"
 clap = { version = "4.4.2", features = ["derive", "env"] }
 colored = "2.0.4"
@@ -35,7 +36,6 @@ assets = "static"
 # You can choose a subset of std or use panic_abort if you don't need unwinding
 build_std = "std,panic_unwind"
 # You can provide a custom JSON file spec
-vita_sdk = "/opt/vitasdk"
 vita_strip_flags = ["-g"]
 vita_make_fself_flags = ["-s"]
 vita_mksfoex_flags = ["-d", "ATTRIBUTE2=12"]

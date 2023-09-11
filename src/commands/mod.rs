@@ -5,7 +5,6 @@ use enum_dispatch::enum_dispatch;
 pub use logs::*;
 pub use reboot::*;
 pub use run::*;
-pub use update::*;
 pub use upload::*;
 
 use crate::meta::TitleId;
@@ -14,7 +13,6 @@ mod build;
 mod logs;
 mod reboot;
 mod run;
-mod update;
 mod upload;
 
 #[derive(Parser, Debug)]
@@ -54,7 +52,7 @@ pub enum CargoCmd {
 
 #[enum_dispatch(CargoCmd)]
 pub trait Executor {
-    fn execute(&self, verbose: u8);
+    fn execute(&self, verbose: u8) -> anyhow::Result<()>;
 }
 
 #[derive(Args, Debug)]
@@ -66,7 +64,7 @@ pub struct TitleArgs {
     title_id: TitleId,
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 pub struct ConnectionArgs {
     /// An IPv4 address of your Vita.
     #[arg(long, short = 'a', env = "VITA_IP")]

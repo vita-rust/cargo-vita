@@ -1,5 +1,6 @@
 {
     "cSpell.words": [
+        "camino",
         "eabi",
         "eboot",
         "fself",
@@ -7,6 +8,7 @@
         "rustc",
         "RUSTFLAGS",
         "velf",
-        "VITASDK"
+        "VITASDK",
+        "walkdir"
     ]
 }

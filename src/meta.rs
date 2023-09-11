@@ -1,12 +1,13 @@
-use std::str::FromStr;
+use std::{fmt::Display, ops::Deref, str::FromStr};
 
+use anyhow::Context;
 use cargo_metadata::{Artifact, MetadataCommand, Package};
 use serde::Deserialize;
 
 pub static VITA_TARGET: &str = "armv7-sony-vita-newlibeabihf";
 
 #[derive(Clone, Debug)]
-pub struct TitleId(pub String);
+pub struct TitleId(String);
 
 impl<'de> Deserialize<'de> for TitleId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -15,6 +16,20 @@ impl<'de> Deserialize<'de> for TitleId {
     {
         let s = String::deserialize(deserializer)?;
         FromStr::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+impl Deref for TitleId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Display for TitleId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 
@@ -66,7 +81,6 @@ pub struct PackageMetadata {
     pub assets: Option<String>,
     #[serde(default = "default_build_std")]
     pub build_std: String,
-    pub vita_sdk: Option<String>,
     #[serde(default = "default_vita_strip_flags")]
     pub vita_strip_flags: Vec<String>,
     #[serde(default = "default_vita_make_fself_flags")]
@@ -82,7 +96,6 @@ impl Default for PackageMetadata {
             title_name: Default::default(),
             assets: Default::default(),
             build_std: default_build_std(),
-            vita_sdk: Default::default(),
             vita_strip_flags: default_vita_strip_flags(),
             vita_make_fself_flags: default_vita_make_fself_flags(),
             vita_mksfoex_flags: default_vita_mksfoex_flags(),
@@ -90,17 +103,15 @@ impl Default for PackageMetadata {
     }
 }
 
-pub fn parse_crate_metadata(artifact: Option<&Artifact>) -> (PackageMetadata, Option<Package>) {
+pub fn parse_crate_metadata(
+    artifact: Option<&Artifact>,
+) -> anyhow::Result<(PackageMetadata, Option<Package>)> {
     let meta = MetadataCommand::new()
         .exec()
-        .expect("Failed to get cargo metadata");
+        .context("Failed to get cargo metadata")?;
 
     let pkg = match artifact {
-        Some(artifact) => meta
-            .packages
-            .iter()
-            .filter(|p| p.id == artifact.package_id)
-            .next(),
+        Some(artifact) => meta.packages.iter().find(|p| p.id == artifact.package_id),
         None => meta.workspace_default_packages().first().cloned(),
     };
 
@@ -108,12 +119,12 @@ pub fn parse_crate_metadata(artifact: Option<&Artifact>) -> (PackageMetadata, Op
         if let Some(metadata) = pkg.metadata.as_object() {
             if let Some(metadata) = metadata.get("vita") {
                 let metadata = serde_json::from_value::<PackageMetadata>(metadata.clone())
-                    .expect("Unable to deserialize `package.metadata.vita`");
+                    .context("Unable to deserialize `package.metadata.vita`")?;
 
-                return (metadata, Some(pkg.clone()));
+                return Ok((metadata, Some(pkg.clone())));
             }
         }
     }
 
-    (Default::default(), pkg.cloned())
+    Ok((Default::default(), pkg.cloned()))
 }
