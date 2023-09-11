@@ -1,5 +1,6 @@
 mod check;
 mod commands;
+mod ftp;
 mod meta;
 mod nc;
 

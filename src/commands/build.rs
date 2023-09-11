@@ -2,17 +2,16 @@ use std::{
     env,
     fs::File,
     io::{self, BufReader},
-    ops::Deref,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
+use crate::ftp;
 use anyhow::{bail, Context};
 use cargo_metadata::{camino::Utf8PathBuf, Artifact, Message, Package};
 use clap::{Args, Subcommand};
 use colored::Colorize;
 use either::Either;
-use ftp::FtpStream;
 use tee::TeeReader;
 use walkdir::WalkDir;
 
@@ -36,7 +35,6 @@ pub struct Build {
     build_args: Vec<String>,
 }
 #[derive(Subcommand, Debug)]
-#[command(allow_external_subcommands = true)]
 enum BuildCmd {
     Elf,
     Velf,
@@ -166,11 +164,11 @@ impl Executor for Build {
                 let artifacts = ctx.build_elf()?;
 
                 for art in &artifacts {
-                    ctx.strip(&art)?;
-                    ctx.velf(&art)?;
-                    ctx.eboot(&art)?;
-                    ctx.sfo(&art)?;
-                    ctx.vpk(&art)?;
+                    ctx.strip(art)?;
+                    ctx.velf(art)?;
+                    ctx.eboot(art)?;
+                    ctx.sfo(art)?;
+                    ctx.vpk(art)?;
                 }
 
                 let mut upload_files = Vec::new();
@@ -272,7 +270,10 @@ impl<'a> BuildContext<'a> {
             println!("{} {command:?}", "Stripping elf:".blue());
         }
 
-        command.status().context("Artifact has no executables")?;
+        if !command.status()?.success() {
+            bail!("arm-vita-eabi-strip failed");
+        }
+
         Ok(())
     }
 
@@ -292,7 +293,10 @@ impl<'a> BuildContext<'a> {
             println!("{} {command:?}", "Creating velf:".blue());
         }
 
-        command.status().context("vita-elf-create failed")?;
+        if !command.status()?.success() {
+            bail!("vita-elf-create failed");
+        }
+
         Ok(())
     }
 
@@ -314,7 +318,10 @@ impl<'a> BuildContext<'a> {
             println!("{} {command:?}", "Creating eboot:".blue());
         }
 
-        command.status().context("vita-make-fself failed")?;
+        if !command.status()?.success() {
+            bail!("vita-make-fself failed");
+        }
+
         Ok(())
     }
 
@@ -352,7 +359,10 @@ impl<'a> BuildContext<'a> {
             println!("{} {command:?}", "Creating sfo:".blue());
         }
 
-        command.status().context("vita-mksfoex failed")?;
+        if !command.status()?.success() {
+            bail!("vita-mksfoex failed");
+        }
+
         Ok(())
     }
 
@@ -394,7 +404,10 @@ impl<'a> BuildContext<'a> {
             println!("{} {command:?}", "Building vpk:".blue());
         }
 
-        command.status().context("vita-mksfoex failed")?;
+        if !command.status()?.success() {
+            bail!("vita-pack-vpk failed")
+        }
+
         Ok(())
     }
 
@@ -408,7 +421,7 @@ impl<'a> BuildContext<'a> {
             .map(|a| {
                 let src = a.elf.with_extension("vpk");
 
-                let separator = if destination.ends_with("/") { "" } else { "/" };
+                let separator = if destination.ends_with('/') { "" } else { "/" };
                 let dest = format!(
                     "{destination}{separator}{}",
                     src.file_name().unwrap_or_default()
@@ -446,15 +459,7 @@ impl<'a> BuildContext<'a> {
             return Ok(());
         }
 
-        let ip = conn.vita_ip.deref();
-        let port = conn.ftp_port;
-
-        if self.verbose > 0 {
-            println!("{} {ip}:{port}", "Connecting to Vita FTP server:".blue())
-        }
-
-        let mut ftp =
-            FtpStream::connect((ip, port)).context("Unable to connect to Vita FTP server")?;
+        let mut ftp = ftp::connect(conn, self.verbose)?;
 
         for (src, dest) in files {
             if self.verbose > 0 {
@@ -462,7 +467,7 @@ impl<'a> BuildContext<'a> {
             }
 
             let src = File::open(src).context("Unable to open source file")?;
-            ftp.put(&dest, &mut BufReader::new(src))
+            ftp.put(dest, &mut BufReader::new(src))
                 .context("Failed to upload file")?;
         }
 

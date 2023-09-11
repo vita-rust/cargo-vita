@@ -1,7 +1,8 @@
 use clap::{Args, Parser, Subcommand};
+use enum_dispatch::enum_dispatch;
 
 pub use build::*;
-use enum_dispatch::enum_dispatch;
+pub use coredump::*;
 pub use logs::*;
 pub use reboot::*;
 pub use run::*;
@@ -10,6 +11,7 @@ pub use upload::*;
 use crate::meta::TitleId;
 
 mod build;
+mod coredump;
 mod logs;
 mod reboot;
 mod run;
@@ -51,6 +53,8 @@ pub enum CargoCmd {
     Run(Run),
     /// Start a TCP server on this machine, to which Vita can stream logs via PrincessLog.
     Logs(Logs),
+    /// Download coredump files from the Vita.
+    Coredump(Coredump),
     /// Reboot the Vita
     Reboot(Reboot),
 }
@@ -73,11 +77,11 @@ pub struct TitleArgs {
 pub struct ConnectionArgs {
     /// An IPv4 address of your Vita.
     #[arg(long, short = 'a', env = "VITA_IP")]
-    vita_ip: String,
+    pub vita_ip: String,
     #[arg(long, short = 'f', env = "VITA_FTP_PORT", default_value_t = 1337)]
-    ftp_port: u16,
+    pub ftp_port: u16,
     #[arg(long, short = 'c', env = "VITA_CMD_PORT", default_value_t = 1338)]
-    cmd_port: u16,
+    pub cmd_port: u16,
 }
 
 #[derive(Args, Debug, Clone)]

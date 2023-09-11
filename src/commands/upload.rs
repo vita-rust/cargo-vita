@@ -1,9 +1,10 @@
-use std::{fs::File, io::BufReader, ops::Deref, path::Path};
+use std::{fs::File, io::BufReader, path::Path};
 
+use crate::ftp;
+use ::ftp::FtpError;
 use anyhow::{bail, Context};
 use clap::Args;
 use colored::Colorize;
-use ftp::FtpStream;
 use walkdir::WalkDir;
 
 use super::{ConnectionArgs, Executor};
@@ -29,14 +30,7 @@ impl Executor for Upload {
             bail!("Source path does not exist");
         }
 
-        let ip = &self.connection.vita_ip;
-        let port = self.connection.ftp_port;
-        if verbose > 0 {
-            println!("{} {ip}:{port}", "Connecting to Vita FTP:".blue(),);
-        }
-
-        let mut ftp =
-            FtpStream::connect((ip.deref(), port)).context("Unable to connect to FTP server")?;
+        let mut ftp = ftp::connect(&self.connection, verbose)?;
 
         let destination = if self.destination.ends_with('/') {
             format!(
@@ -105,7 +99,7 @@ impl Executor for Upload {
                         }
                         match ftp.mkdir(&destination) {
                             Ok(_) => {}
-                            Err(ftp::FtpError::InvalidResponse(e))
+                            Err(FtpError::InvalidResponse(e))
                                 if e.starts_with("226 Directory created.") => {}
                             Err(e) => {
                                 if verbose > 1 {
