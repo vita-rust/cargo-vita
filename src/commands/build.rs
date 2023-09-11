@@ -28,12 +28,17 @@ pub struct Build {
     #[arg(long, value_parser = clap::value_parser!(TitleId))]
     default_title_id: Option<TitleId>,
 
+    /// Pass additional options through to the `cargo` command.
+    ///
+    /// All arguments after the first `--`, or starting with the first unrecognized
+    /// option, will be passed through to `cargo` unmodified.
     #[arg(trailing_var_arg = true)]
     #[arg(allow_hyphen_values = true)]
     #[arg(global = true)]
     #[arg(name = "CARGO_ARGS")]
     build_args: Vec<String>,
 }
+
 #[derive(Subcommand, Debug)]
 enum BuildCmd {
     Elf,

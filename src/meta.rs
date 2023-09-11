@@ -1,4 +1,4 @@
-use std::{env, fmt::Display, ops::Deref, path::PathBuf, process::Command, str::FromStr};
+use std::{fmt::Display, ops::Deref, str::FromStr};
 
 use anyhow::Context;
 use cargo_metadata::{Artifact, MetadataCommand, Package};
@@ -112,11 +112,7 @@ pub fn parse_crate_metadata(
 
     let pkg = match artifact {
         Some(artifact) => meta.packages.iter().find(|p| p.id == artifact.package_id),
-        None => workspace_default_packages()
-            .ok()
-            .unwrap_or_default()
-            .first()
-            .and_then(|id| meta.packages.iter().find(|p| &p.id.repr == id)),
+        None => meta.workspace_default_packages().first().cloned(),
     };
 
     if let Some(pkg) = pkg {
@@ -131,22 +127,4 @@ pub fn parse_crate_metadata(
     }
 
     Ok((Default::default(), pkg.cloned()))
-}
-
-fn workspace_default_packages() -> anyhow::Result<Vec<String>> {
-    let cargo = env::var("CARGO")
-        .map(PathBuf::from)
-        .ok()
-        .unwrap_or_else(|| PathBuf::from("cargo"));
-    let mut cmd = Command::new(cargo);
-    cmd.args(["metadata", "--format-version", "1"]);
-
-    let output = cmd.output()?;
-    let output = String::from_utf8(output.stdout)?;
-
-    let json = serde_json::from_str::<serde_json::Value>(&output)?;
-    match json.get("workspace_default_members") {
-        Some(members) => Ok(serde_json::from_value(members.clone())?),
-        None => Ok(Vec::new()),
-    }
 }
