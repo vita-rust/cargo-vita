@@ -1,5 +1,9 @@
 # cargo-vita
 
+[![Crates.io](https://img.shields.io/crates/v/cargo-vita.svg)](https://crates.io/crates/cargo-vita)
+[![MIT/Apache 2.0](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](https://github.com/vita-rust/cargo-vita#license)
+
+
 Cargo command to work with Sony PlayStation Vita rust project binaries.
 
 For general guidelines see [vita-rust wiki](https://github.com/vita-rust/std-newlib/wiki)
@@ -10,6 +14,12 @@ For general guidelines see [vita-rust wiki](https://github.com/vita-rust/std-new
 - [vitacompanion](https://github.com/devnoname120/vitacompanion) for ftp and command server (uploading and running artifacts)
 - [PrincessLog](https://github.com/CelesteBlue-dev/PSVita-RE-tools/tree/master/PrincessLog/build) is required for `cargo vita logs`
 - [vita-parse-core](https://github.com/xyzz/vita-parse-core) for `cargo vita coredump parse`
+
+## Installation
+
+```
+cargo +nightly install cargo-vita
+```
 
 ## Usage
 
@@ -57,3 +67,12 @@ cargo vita -v build eboot --update --run -- --release
 # Start a TCP server and listen for logs. Send a termination signal to stop (e.g. ctrl+c)
 cargo vita -v logs
 ```
+
+## License
+
+Except where noted (below and/or in individual files), all code in this repository is dual-licensed under either:
+
+* MIT License ([LICENSE-MIT](LICENSE-MIT) or [http://opensource.org/licenses/MIT](http://opensource.org/licenses/MIT))
+* Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0))
+
+at your option.
