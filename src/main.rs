@@ -13,7 +13,7 @@ fn main() {
     check_rust_version();
 
     let Cargo::Input(input) = Cargo::parse();
-    match input.cmd.execute(input.verbose) {
+    match input.cmd.execute(1 + input.verbose - input.quiet as u8) {
         Ok(_) => {}
         Err(e) => {
             eprintln!("{} {}", "Error:".bold().red(), format!("{e:?}").red());

@@ -31,6 +31,10 @@ pub struct Input {
     #[command(subcommand)]
     pub cmd: CargoCmd,
 
+    /// By default, verbose level is 1. Setting quiet flag will reduce it by one.
+    #[arg(long, short = 'q')]
+    pub quiet: bool,
+
     /// Print the exact commands `cargo-vita` is running.
     /// Passing this flag multiple times will enable verbose mode for the rust compiler.
     #[arg(long, short = 'v', action = clap::ArgAction::Count)]
