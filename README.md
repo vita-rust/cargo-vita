@@ -48,6 +48,29 @@ Options:
 
 The `build` command pass-through arguments are passed to cargo build.
 
+## Parameterizing your project
+
+`cargo-vita` uses information in `Cargo.toml` to build your vpk.
+
+Add the following section to `Cargo.toml` of your project:
+
+```toml
+[package.metadata.vita]
+# A unique identifier for your project. 9 chars, alphanumeric.
+title_id = "RUSTAPP01"
+# A title that will be shown on a bubble. Optional, will take the crate name as the default
+title_name = "My application"
+# Optional. A path to static files relative to the project.
+assets = "static"
+# Optional, this is the default
+build_std = "std,panic_unwind"
+# Optional, this is the default
+vita_strip_flags = ["-g"]
+# Optional, this is the default
+vita_make_fself_flags = ["-s"]
+# Optional, this is the default
+vita_mksfoex_flags = ["-d", "ATTRIBUTE2=12"]
+```
 
 ## Examples
 
