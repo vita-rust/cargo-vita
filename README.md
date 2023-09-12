@@ -41,6 +41,7 @@ Commands:
   help      Print this message or the help of the given subcommand(s)
 
 Options:
+  -q, --quiet       By default, verbose level is 1. Setting quiet flag will reduce it by one
   -v, --verbose...  Print the exact commands `cargo-vita` is running. Passing this flag multiple times will enable verbose mode for the rust compiler
   -h, --help        Print help (see more with '--help')
   -V, --version     Print version
@@ -76,19 +77,19 @@ vita_mksfoex_flags = ["-d", "ATTRIBUTE2=12"]
 
 ```
 # Build all current/all workspace projects in release mode as vpk
-cargo vita -v build vpk -- --release
+cargo vita build vpk -- --release
 
 # Build tests of current/all workspace projects in release mode as vpk
-cargo vita -v build vpk -- --release --tests
+cargo vita build vpk -- --release --tests
 
 # Build examples of current/all workspace projects in release mode as vpk and upload vpk files to ux0:/download/
-cargo vita -v build vpk --upload -- --release --examples
+cargo vita build vpk --upload -- --release --examples
 
 # Build a eboot.bin, upload it to Vita and run it. The VPK must already be installed for that to work.
-cargo vita -v build eboot --update --run -- --release
+cargo vita build eboot --update --run -- --release
 
 # Start a TCP server and listen for logs. Send a termination signal to stop (e.g. ctrl+c)
-cargo vita -v logs
+cargo vita logs
 ```
 
 ## License
