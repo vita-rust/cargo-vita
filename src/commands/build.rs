@@ -103,6 +103,7 @@ impl<'a> BuildContext<'a> {
 }
 
 struct ExecutableArtifact {
+    artifact: Artifact,
     meta: PackageMetadata,
     package: Package,
 
@@ -121,6 +122,7 @@ impl ExecutableArtifact {
             .to_owned();
 
         Ok(Self {
+            artifact,
             meta,
             package,
             elf: executable,
@@ -384,7 +386,14 @@ impl<'a> BuildContext<'a> {
         command.arg("-b").arg(eboot);
 
         if let Some(assets) = &art.meta.assets {
-            let files = WalkDir::new(assets)
+            let assets = art
+                .artifact
+                .manifest_path
+                .parent()
+                .context("Unable to get target manifest directory")?
+                .join(assets);
+
+            let files = WalkDir::new(&assets)
                 .into_iter()
                 .filter_map(|e| e.ok())
                 .filter(|e| e.file_type().is_file());
@@ -394,7 +403,7 @@ impl<'a> BuildContext<'a> {
                     "{}={}",
                     file.path().display(), // path on FS
                     file.path()
-                        .strip_prefix(assets)
+                        .strip_prefix(&assets)
                         .context("Unable to strip VPK prefix")?
                         .display()  // path in VPK
                 ));
