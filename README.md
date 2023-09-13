@@ -49,7 +49,16 @@ Options:
 
 The `build` command pass-through arguments are passed to cargo build.
 
-## Parameterizing your project
+## Setting up the environment
+
+`cargo-vita` requires you to set `VITASDK` environment variable. In addition to that, if you are planning on
+uploading files, running executables and working with core dumps with this tool, it is recommended to set
+`VITA_IP` environment variable instead of passing it to every command as an argument.
+
+You can set these environment variables in your shell configuration (such as `.bashrc`), use [direnv](https://direnv.net/),
+and additionally this tool will parse your projects `.cargo/config.toml` for `[env]` section.
+
+## Parameterize your project
 
 `cargo-vita` uses information in `Cargo.toml` to build your vpk.
 
@@ -94,9 +103,8 @@ cargo vita logs
 
 ## License
 
-Except where noted (below and/or in individual files), all code in this repository is dual-licensed under either:
+Except where noted (below and/or in individual files), all code in this repository is dual-licensed at your option under either:
 
 * MIT License ([LICENSE-MIT](LICENSE-MIT) or [http://opensource.org/licenses/MIT](http://opensource.org/licenses/MIT))
 * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0))
 
-at your option.
