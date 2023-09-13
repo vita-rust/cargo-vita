@@ -233,8 +233,8 @@ impl<'a> BuildContext<'a> {
             .arg("--message-format")
             .arg("json-render-diagnostics")
             .args(&self.command.build_args)
-            .stdout(Stdio::piped())
             .stdin(Stdio::inherit())
+            .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
 
         if self.verbose > 0 {
@@ -271,8 +271,8 @@ impl<'a> BuildContext<'a> {
         command
             .args(&art.meta.vita_strip_flags)
             .arg(&art.elf)
-            .stdout(Stdio::piped())
             .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
 
         if self.verbose > 0 {
@@ -294,8 +294,8 @@ impl<'a> BuildContext<'a> {
         command
             .arg(elf)
             .arg(velf)
-            .stdout(Stdio::piped())
             .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
 
         if self.verbose > 0 {
@@ -319,8 +319,8 @@ impl<'a> BuildContext<'a> {
             .args(&art.meta.vita_make_fself_flags)
             .arg(&velf)
             .arg(&eboot)
-            .stdout(Stdio::piped())
             .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
 
         if self.verbose > 0 {
@@ -360,8 +360,8 @@ impl<'a> BuildContext<'a> {
         command
             .arg(title_name)
             .arg(sfo)
-            .stdout(Stdio::piped())
             .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
 
         if self.verbose > 0 {
@@ -412,8 +412,8 @@ impl<'a> BuildContext<'a> {
 
         command
             .arg(vpk)
-            .stdout(Stdio::piped())
             .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
 
         if self.verbose > 0 {

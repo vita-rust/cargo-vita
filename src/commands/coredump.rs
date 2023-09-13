@@ -37,6 +37,9 @@ pub struct Parse {
     /// If ELF file is not explicitly provided, will use the artifact from this profile.
     #[arg(long, short = 'p', default_value = "release")]
     profile: String,
+    /// If true, will save coredump to tmp. Otherwise coredump is not saved to disk.
+    #[arg(long, short = 's', default_value = "false")]
+    persist: bool,
     #[command(flatten)]
     connection: ConnectionArgs,
 }
@@ -52,18 +55,37 @@ impl Executor for Coredump {
         match &self.cmd {
             CoredumpCmd::Parse(args) => {
                 let mut ftp = ftp::connect(&args.connection, verbose)?;
+                ftp.cwd("ux0:/data/")
+                    .context("Unable to cwd to ux0:/data/")?;
                 let files = ftp.list(None).context("Unable to list files in cwd")?;
+
                 if let Some(coredump) = find_core_dumps(&files).max() {
                     if verbose > 0 {
                         println!("{} {coredump}", "Downloading file:".blue())
                     }
                     let mut reader = ftp.get(coredump).context("Unable to download coredump")?;
 
-                    let mut coredump =
+                    let mut tmp_file =
                         NamedTempFile::new().context("Unable to create temporary file")?;
-                    io::copy(&mut reader, &mut coredump)
+
+                    io::copy(&mut reader, &mut tmp_file)
                         .context("Unable to write coredump to file")?;
-                    let coredump = coredump.into_temp_path();
+
+                    let tmp_file = tmp_file.into_temp_path();
+
+                    let path = if args.persist {
+                        let file = tmp_file
+                            .parent()
+                            .context("Unable to get parent directory")?
+                            .join(coredump);
+
+                        tmp_file
+                            .persist(&file)
+                            .context("Unable to persist coredump")?;
+                        file
+                    } else {
+                        tmp_file.to_path_buf()
+                    };
 
                     let elf = match &args.elf {
                         Some(elf) => elf.clone(),
@@ -93,11 +115,15 @@ impl Executor for Coredump {
                     let mut command = Command::new("vita-parse-core");
 
                     command
-                        .arg(coredump)
+                        .arg(&path)
                         .arg(&elf)
-                        .stdout(Stdio::piped())
                         .stdin(Stdio::inherit())
+                        .stdout(Stdio::inherit())
                         .stderr(Stdio::inherit());
+
+                    if verbose > 0 {
+                        println!("{} {command:?}", "Parsing coredump:".blue());
+                    }
 
                     if !command.status()?.success() {
                         bail!("vita-parse-core failed");
