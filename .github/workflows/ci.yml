@@ -71,10 +71,20 @@ jobs:
             os: macos-latest
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-20.04
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-20.04
+            c: true
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-20.04
+            c: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-20.04
+            c: true
     name: GitHub Release (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     needs: [check, clippy]
     steps:
+      - run: sudo apt install -y musl-tools musl-dev
       - name: Checkout
         uses: actions/checkout@v4
       - name: rust-toolchain
@@ -83,7 +93,13 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
       - name: "`cargo build --release`"
+        if: "!matrix.c"
         run: cargo build --release --target ${{ matrix.target }}
+      - name: '`cargo zigbuild --release`'
+        if: "matrix.c"
+        run: |
+          pip3 install cargo-zigbuild
+          cargo zigbuild --release --target ${{ matrix.target }}
       - name: Create an asset
         id: asset
         run: |
