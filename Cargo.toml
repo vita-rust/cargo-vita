@@ -1,6 +1,6 @@
 [package]
 name = "cargo-vita"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 description = "Cargo wrapper for developing Sony PlayStation Vita homebrew apps"
 repository = "https://github.com/vita-rust/cargo-vita"
