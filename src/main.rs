@@ -11,6 +11,7 @@ use commands::{Cargo, Executor};
 
 fn main() {
     check_rust_version();
+    let _ = check::set_cargo_config_env();
 
     let Cargo::Input(input) = Cargo::parse();
     match input.cmd.execute(1 + input.verbose - input.quiet as u8) {
