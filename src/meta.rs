@@ -1,7 +1,7 @@
 use std::{fmt::Display, ops::Deref, str::FromStr};
 
 use anyhow::Context;
-use cargo_metadata::{Artifact, MetadataCommand, Package};
+use cargo_metadata::{camino::Utf8PathBuf, Artifact, MetadataCommand, Package};
 use serde::Deserialize;
 
 pub static VITA_TARGET: &str = "armv7-sony-vita-newlibeabihf";
@@ -105,7 +105,7 @@ impl Default for PackageMetadata {
 
 pub fn parse_crate_metadata(
     artifact: Option<&Artifact>,
-) -> anyhow::Result<(PackageMetadata, Option<Package>)> {
+) -> anyhow::Result<(PackageMetadata, Option<Package>, Utf8PathBuf)> {
     let meta = MetadataCommand::new()
         .exec()
         .context("Failed to get cargo metadata")?;
@@ -121,10 +121,10 @@ pub fn parse_crate_metadata(
                 let metadata = serde_json::from_value::<PackageMetadata>(metadata.clone())
                     .context("Unable to deserialize `package.metadata.vita`")?;
 
-                return Ok((metadata, Some(pkg.clone())));
+                return Ok((metadata, Some(pkg.clone()), meta.target_directory));
             }
         }
     }
 
-    Ok((Default::default(), pkg.cloned()))
+    Ok((Default::default(), pkg.cloned(), meta.target_directory))
 }

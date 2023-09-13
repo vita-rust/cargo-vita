@@ -35,7 +35,7 @@ pub struct Parse {
     #[arg(long)]
     elf: Option<String>,
     /// If ELF file is not explicitly provided, will use the artifact from this profile.
-    #[arg(long, short = 'p', default_value = "release")]
+    #[arg(long, short = 'p', default_value = "debug")]
     profile: String,
     /// If true, will save coredump to tmp. Otherwise coredump is not saved to disk.
     #[arg(long, short = 's', default_value = "false")]
@@ -90,23 +90,13 @@ impl Executor for Coredump {
                     let elf = match &args.elf {
                         Some(elf) => elf.clone(),
                         None => {
-                            let (_, pkg) = parse_crate_metadata(None)?;
+                            let (_, pkg, target_directory) = parse_crate_metadata(None)?;
                             let pkg = pkg.context("Not in a crate")?;
 
-                            pkg.targets
-                                .iter()
-                                .find_map(|target| {
-                                    if target.is_bin() {
-                                        pkg.manifest_path.parent()
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .context("Unable to find elf file")?
-                                .join("target")
+                            target_directory
                                 .join(VITA_TARGET)
                                 .join(&args.profile)
-                                .join(&pkg.name)
+                                .join(pkg.name)
                                 .with_extension("elf")
                                 .to_string()
                         }

@@ -112,7 +112,7 @@ struct ExecutableArtifact {
 
 impl ExecutableArtifact {
     fn new(artifact: Artifact) -> anyhow::Result<Self> {
-        let (meta, package) = parse_crate_metadata(Some(&artifact))?;
+        let (meta, package, _) = parse_crate_metadata(Some(&artifact))?;
         let package = package.context("artifact does not have a package")?;
 
         let executable = artifact
@@ -218,7 +218,7 @@ impl<'a> BuildContext<'a> {
         }
 
         // FIXME: A horrible solution, the same -Z flag will be used for all of the crates in a workspace.
-        let (meta, _) = parse_crate_metadata(None)?;
+        let (meta, _, _) = parse_crate_metadata(None)?;
 
         command
             .env("RUSTFLAGS", rust_flags)

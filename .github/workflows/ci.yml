@@ -84,7 +84,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: [check, clippy]
     steps:
-      - run: sudo apt install -y musl-tools musl-dev
       - name: Checkout
         uses: actions/checkout@v4
       - name: rust-toolchain
