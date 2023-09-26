@@ -96,9 +96,12 @@ impl<'a> BuildContext<'a> {
         })
     }
 
+    fn sdk(&self, path: &str) -> PathBuf {
+        Path::new(&self.sdk).join(path)
+    }
+
     fn sdk_binary(&self, binary: &str) -> PathBuf {
-        let sdk = Path::new(&self.sdk);
-        sdk.join("bin").join(binary)
+        self.sdk("bin").join(binary)
     }
 }
 
@@ -220,10 +223,26 @@ impl<'a> BuildContext<'a> {
         // FIXME: A horrible solution, the same -Z flag will be used for all of the crates in a workspace.
         let (meta, _, _) = parse_crate_metadata(None)?;
 
+        let openssl_lib = env::var("OPENSSL_LIB_DIR").unwrap_or_else(|_| {
+            self.sdk("arm-vita-eabi")
+                .join("lib")
+                .to_string_lossy()
+                .into()
+        });
+
+        let openssl_include = env::var("OPENSSL_INCLUDE_DIR").unwrap_or_else(|_| {
+            self.sdk("arm-vita-eabi")
+                .join("include")
+                .to_string_lossy()
+                .into()
+        });
+
         command
             .env("RUSTFLAGS", rust_flags)
             .env("TARGET_CC", "arm-vita-eabi-gcc")
             .env("TARGET_CXX", "arm-vita-eabi-g++")
+            .env("OPENSSL_LIB_DIR", openssl_lib)
+            .env("OPENSSL_INCLUDE_DIR", openssl_include)
             .env("VITASDK", &self.sdk)
             .arg("build")
             .arg("-Z")
