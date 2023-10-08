@@ -105,6 +105,7 @@ impl<'a> BuildContext<'a> {
     }
 }
 
+#[derive(Debug)]
 struct ExecutableArtifact {
     artifact: Artifact,
     meta: PackageMetadata,
@@ -273,7 +274,7 @@ impl<'a> BuildContext<'a> {
             .collect::<io::Result<_>>()
             .context("Unable to parse build stdout")?;
 
-        messages
+        let artifacts = messages
             .iter()
             .rev()
             .filter_map(|m| match m {
@@ -281,7 +282,13 @@ impl<'a> BuildContext<'a> {
                 _ => None,
             })
             .map(ExecutableArtifact::new)
-            .collect()
+            .collect::<anyhow::Result<_>>()?;
+
+        if !process.wait_with_output()?.status.success() {
+            bail!("cargo build failed")
+        }
+
+        Ok(artifacts)
     }
 
     fn strip(&self, art: &ExecutableArtifact) -> anyhow::Result<()> {
