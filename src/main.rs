@@ -18,6 +18,7 @@ fn main() {
         Ok(_) => {}
         Err(e) => {
             eprintln!("{} {}", "Error:".bold().red(), format!("{e:?}").red());
+            std::process::exit(1);
         }
     }
 }
