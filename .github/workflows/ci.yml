@@ -122,9 +122,16 @@ jobs:
         shell: bash
       - name: Build Changelog
         id: github_release
-        uses: mikepenz/release-changelog-builder-action@v3
+        uses: mikepenz/release-changelog-builder-action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          configurationJson: |
+            {
+              "tag_resolver": {
+                "pattern": "v(.+)"
+              }
+            }
       - name: GH Release
         uses: softprops/action-gh-release@v1
         with:
