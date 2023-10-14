@@ -224,26 +224,18 @@ impl<'a> BuildContext<'a> {
         // FIXME: A horrible solution, the same -Z flag will be used for all of the crates in a workspace.
         let (meta, _, _) = parse_crate_metadata(None)?;
 
-        let openssl_lib = env::var("OPENSSL_LIB_DIR").unwrap_or_else(|_| {
-            self.sdk("arm-vita-eabi")
-                .join("lib")
-                .to_string_lossy()
-                .into()
-        });
-
-        let openssl_include = env::var("OPENSSL_INCLUDE_DIR").unwrap_or_else(|_| {
-            self.sdk("arm-vita-eabi")
-                .join("include")
-                .to_string_lossy()
-                .into()
-        });
-
         command
             .env("RUSTFLAGS", rust_flags)
             .env("TARGET_CC", "arm-vita-eabi-gcc")
             .env("TARGET_CXX", "arm-vita-eabi-g++")
-            .env("OPENSSL_LIB_DIR", openssl_lib)
-            .env("OPENSSL_INCLUDE_DIR", openssl_include)
+            .pass_path_env("OPENSSL_LIB_DIR", || self.sdk("arm-vita-eabi").join("lib"))
+            .pass_path_env("OPENSSL_INCLUDE_DIR", || {
+                self.sdk("arm-vita-eabi").join("include")
+            })
+            .pass_path_env("PKG_CONFIG_PATH", || {
+                self.sdk("arm-vita-eabi").join("lib").join("pkgconfig")
+            })
+            .pass_env("PKG_CONFIG_SYSROOT_DIR", || &self.sdk)
             .env("VITASDK", &self.sdk)
             .arg("build")
             .arg("-Z")
@@ -534,5 +526,34 @@ impl<'a> BuildContext<'a> {
         }
 
         Ok(())
+    }
+}
+
+trait CommandExt {
+    fn pass_env<K, V>(&mut self, key: K, default: impl Fn() -> V) -> &mut Command
+    where
+        K: AsRef<str>,
+        V: AsRef<str>;
+
+    fn pass_path_env<K, V>(&mut self, key: K, default: impl Fn() -> V) -> &mut Command
+    where
+        K: AsRef<str>,
+        V: AsRef<Path>,
+    {
+        self.pass_env(key, || default().as_ref().to_string_lossy().to_string())
+    }
+}
+
+impl CommandExt for Command {
+    fn pass_env<K, V>(&mut self, key: K, default: impl Fn() -> V) -> &mut Command
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let key = key.as_ref();
+        match env::var(key) {
+            Ok(val) => self.env(key, val),
+            Err(_) => self.env(key, default().as_ref()),
+        }
     }
 }
