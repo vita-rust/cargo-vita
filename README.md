@@ -6,7 +6,7 @@
 
 Cargo command to work with Sony PlayStation Vita rust project binaries.
 
-For general guidelines see [vita-rust wiki](https://github.com/vita-rust/std/wiki)
+For general guidelines see [vita-rust book](https://vita-rust.github.io/book)
 
 ## Requirements
 
