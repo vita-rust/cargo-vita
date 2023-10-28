@@ -28,7 +28,8 @@ pub fn set_cargo_config_env() -> anyhow::Result<()> {
     let cargo = env::var_os("CARGO");
     let mut child = Command::new(cargo.as_deref().unwrap_or_else(|| "cargo".as_ref()))
         .args(["config", "get", "-Zunstable-options", "--format=json"])
-        .stdout(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .stdin(Stdio::null())
         .spawn()
         .context("spawning `cargo config get` process")?;
