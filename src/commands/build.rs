@@ -501,7 +501,7 @@ impl<'a> BuildContext<'a> {
             }
 
             let src = File::open(src).context("Unable to open source file")?;
-            ftp.put(dest, &mut BufReader::new(src))
+            ftp.put_file(dest, &mut BufReader::new(src))
                 .context("Failed to upload file")?;
         }
 

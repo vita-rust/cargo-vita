@@ -3,10 +3,10 @@ use std::{
     process::{Command, Stdio},
 };
 
-use ::ftp::FtpError;
 use anyhow::{bail, Context};
 use clap::{Args, Subcommand};
 use colored::Colorize;
+use suppaftp::FtpError;
 use tempfile::NamedTempFile;
 
 use super::{ConnectionArgs, Executor};
@@ -63,7 +63,9 @@ impl Executor for Coredump {
                     if verbose > 0 {
                         println!("{} {coredump}", "Downloading file:".blue())
                     }
-                    let mut reader = ftp.get(coredump).context("Unable to download coredump")?;
+                    let mut reader = ftp
+                        .retr_as_buffer(coredump)
+                        .context("Unable to download coredump")?;
 
                     let mut tmp_file =
                         NamedTempFile::new().context("Unable to create temporary file")?;
@@ -138,7 +140,8 @@ impl Executor for Coredump {
 
                     match ftp.rm(file) {
                         Ok(_) => {}
-                        Err(FtpError::InvalidResponse(e)) if e.contains("226 File deleted") => {}
+                        Err(FtpError::UnexpectedResponse(e))
+                            if String::from_utf8_lossy(&e.body).contains("226 File deleted") => {}
                         Err(e) => return Err(e).context("Unable to delete file"),
                     }
                 }
