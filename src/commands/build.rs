@@ -12,6 +12,7 @@ use cargo_metadata::{camino::Utf8PathBuf, Artifact, Message, Package};
 use clap::{Args, Subcommand};
 use colored::Colorize;
 use either::Either;
+use log::info;
 use tee::TeeReader;
 use walkdir::WalkDir;
 
@@ -75,12 +76,10 @@ struct Vpk {
 struct BuildContext<'a> {
     command: &'a Build,
     sdk: String,
-
-    verbose: u8,
 }
 
 impl<'a> BuildContext<'a> {
-    pub fn new(command: &'a Build, verbose: u8) -> anyhow::Result<Self> {
+    pub fn new(command: &'a Build) -> anyhow::Result<Self> {
         let sdk = std::env::var("VITASDK");
         let sdk = sdk.or_else(|_| {
             bail!(
@@ -89,11 +88,7 @@ impl<'a> BuildContext<'a> {
             )
         })?;
 
-        Ok(Self {
-            command,
-            sdk,
-            verbose,
-        })
+        Ok(Self { command, sdk })
     }
 
     fn sdk(&self, path: &str) -> PathBuf {
@@ -135,8 +130,8 @@ impl ExecutableArtifact {
 }
 
 impl Executor for Build {
-    fn execute(&self, verbose: u8) -> anyhow::Result<()> {
-        let ctx = BuildContext::new(self, verbose)?;
+    fn execute(&self) -> anyhow::Result<()> {
+        let ctx = BuildContext::new(self)?;
 
         match &self.cmd {
             BuildCmd::Elf => {
@@ -221,7 +216,8 @@ impl<'a> BuildContext<'a> {
             command.env("PATH", path);
         }
 
-        // FIXME: A horrible solution, the same -Z flag will be used for all of the crates in a workspace.
+        // FIXME: move build-std to env/config.toml, since it is shared by all of the crates built
+        // This still works correctly when building only a single workspace crate though
         let (meta, _, _) = parse_crate_metadata(None)?;
 
         command
@@ -249,14 +245,12 @@ impl<'a> BuildContext<'a> {
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
 
-        if self.verbose > 0 {
-            println!("{} {command:?}", "Running cargo:".blue());
-        }
+        info!("{}: {command:?}", "Running cargo".blue());
 
         let mut process = command.spawn().context("Unable to spawn build process")?;
         let command_stdout = process.stdout.take().context("Build failed")?;
 
-        let reader = if self.verbose > 1 {
+        let reader = if log::max_level() >= log::LevelFilter::Trace {
             Either::Left(BufReader::new(TeeReader::new(command_stdout, io::stdout())))
         } else {
             Either::Right(BufReader::new(command_stdout))
@@ -293,9 +287,7 @@ impl<'a> BuildContext<'a> {
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
 
-        if self.verbose > 0 {
-            println!("{} {command:?}", "Stripping elf:".blue());
-        }
+        info!("{}: {command:?}", "Stripping elf".blue());
 
         if !command.status()?.success() {
             bail!("arm-vita-eabi-strip failed");
@@ -316,9 +308,7 @@ impl<'a> BuildContext<'a> {
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
 
-        if self.verbose > 0 {
-            println!("{} {command:?}", "Creating velf:".blue());
-        }
+        info!("{}: {command:?}", "Creating velf".blue());
 
         if !command.status()?.success() {
             bail!("vita-elf-create failed");
@@ -341,9 +331,7 @@ impl<'a> BuildContext<'a> {
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
 
-        if self.verbose > 0 {
-            println!("{} {command:?}", "Creating eboot:".blue());
-        }
+        info!("{}: {command:?}", "Creating eboot".blue());
 
         if !command.status()?.success() {
             bail!("vita-make-fself failed");
@@ -382,9 +370,7 @@ impl<'a> BuildContext<'a> {
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
 
-        if self.verbose > 0 {
-            println!("{} {command:?}", "Creating sfo:".blue());
-        }
+        info!("{}: {command:?}", "Creating sfo".blue());
 
         if !command.status()?.success() {
             bail!("vita-mksfoex failed");
@@ -434,9 +420,7 @@ impl<'a> BuildContext<'a> {
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
 
-        if self.verbose > 0 {
-            println!("{} {command:?}", "Building vpk:".blue());
-        }
+        info!("{}: {command:?}", "Building vpk".blue());
 
         if !command.status()?.success() {
             bail!("vita-pack-vpk failed")
@@ -493,12 +477,10 @@ impl<'a> BuildContext<'a> {
             return Ok(());
         }
 
-        let mut ftp = ftp::connect(conn, self.verbose)?;
+        let mut ftp = ftp::connect(conn)?;
 
         for (src, dest) in files {
-            if self.verbose > 0 {
-                println!("{} {src} {} {dest}", "Uploading file".blue(), "to".blue())
-            }
+            info!("{} {src} {} {dest}", "Uploading".blue(), "file to".blue());
 
             let src = File::open(src).context("Unable to open source file")?;
             ftp.put_file(dest, &mut BufReader::new(src))
@@ -521,7 +503,7 @@ impl<'a> BuildContext<'a> {
                     title_id: Some(title_id.clone()),
                     connection: conn.clone(),
                 }
-                .execute(self.verbose)?;
+                .execute()?;
             }
         }
 

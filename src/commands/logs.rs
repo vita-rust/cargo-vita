@@ -3,6 +3,7 @@ use std::{io::Read, net::TcpListener};
 use anyhow::Context;
 use clap::Args;
 use colored::Colorize;
+use log::{debug, error, info};
 
 use super::Executor;
 
@@ -13,10 +14,8 @@ pub struct Logs {
 }
 
 impl Executor for Logs {
-    fn execute(&self, verbose: u8) -> anyhow::Result<()> {
-        if verbose > 0 {
-            println!("{} {}", "Starting TCP server on port".blue(), self.port);
-        }
+    fn execute(&self) -> anyhow::Result<()> {
+        info!("{} {}", "Starting TCP server on port".blue(), self.port);
 
         let listener =
             TcpListener::bind(("0.0.0.0", self.port)).context("Unable to start TCP server")?;
@@ -24,29 +23,25 @@ impl Executor for Logs {
         for stream in listener.incoming() {
             match stream {
                 Ok(mut client) => {
-                    if verbose > 1 {
-                        println!(
-                            "{}: {}",
-                            "Accepted connection from".blue(),
-                            client.peer_addr().context("Unable to get peer address")?
-                        );
-                    }
+                    debug!(
+                        "{}: {}",
+                        "Accepted connection from".blue(),
+                        client.peer_addr().context("Unable to get peer address")?
+                    );
 
                     std::thread::spawn(move || {
                         let mut buffer = [0; 1024];
                         loop {
                             match client.read(&mut buffer) {
                                 Ok(0) => {
-                                    if verbose > 1 {
-                                        println!("{}", "Client disconnected".blue());
-                                    }
+                                    debug!("{}", "Client disconnected".blue());
                                     break;
                                 }
                                 Ok(bytes_read) => {
                                     print!("{}", String::from_utf8_lossy(&buffer[..bytes_read]))
                                 }
                                 Err(e) => {
-                                    eprintln!("{}: {}", "Error reading from client".red(), e);
+                                    error!("{}: {}", "Error reading from client", e);
                                     break;
                                 }
                             }
@@ -54,7 +49,7 @@ impl Executor for Logs {
                     });
                 }
                 Err(e) => {
-                    eprintln!("Error accepting connection: {}", e);
+                    error!("Error accepting connection: {}", e);
                 }
             }
         }

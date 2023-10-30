@@ -66,7 +66,7 @@ pub enum CargoCmd {
 
 #[enum_dispatch(CargoCmd)]
 pub trait Executor {
-    fn execute(&self, verbose: u8) -> anyhow::Result<()>;
+    fn execute(&self) -> anyhow::Result<()>;
 }
 
 #[derive(Args, Debug)]

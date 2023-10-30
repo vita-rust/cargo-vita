@@ -15,7 +15,7 @@ pub struct Run {
 }
 
 impl Executor for Run {
-    fn execute(&self, verbose: u8) -> anyhow::Result<()> {
+    fn execute(&self) -> anyhow::Result<()> {
         let title_id = match &self.title_id {
             Some(title_id) => title_id.clone(),
             None => parse_crate_metadata(None)?.0.title_id
@@ -25,8 +25,8 @@ impl Executor for Run {
         let ip = &self.connection.vita_ip;
         let port = self.connection.cmd_port;
 
-        nc(verbose, ip, port, "destroy")?;
-        nc(verbose, ip, port, &format!("launch {title_id}"))?;
+        nc(ip, port, "destroy")?;
+        nc(ip, port, &format!("launch {title_id}"))?;
 
         Ok(())
     }

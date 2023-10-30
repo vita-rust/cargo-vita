@@ -6,6 +6,7 @@ use std::{
 use anyhow::{bail, Context};
 use clap::{Args, Subcommand};
 use colored::Colorize;
+use log::{info, warn};
 use suppaftp::FtpError;
 use tempfile::NamedTempFile;
 
@@ -51,18 +52,17 @@ pub struct Clean {
 }
 
 impl Executor for Coredump {
-    fn execute(&self, verbose: u8) -> anyhow::Result<()> {
+    fn execute(&self) -> anyhow::Result<()> {
         match &self.cmd {
             CoredumpCmd::Parse(args) => {
-                let mut ftp = ftp::connect(&args.connection, verbose)?;
+                let mut ftp = ftp::connect(&args.connection)?;
+
                 ftp.cwd("ux0:/data/")
                     .context("Unable to cwd to ux0:/data/")?;
                 let files = ftp.list(None).context("Unable to list files in cwd")?;
 
                 if let Some(coredump) = find_core_dumps(&files).max() {
-                    if verbose > 0 {
-                        println!("{} {coredump}", "Downloading file:".blue())
-                    }
+                    info!("{}: {coredump}", "Downloading file".blue());
                     let mut reader = ftp
                         .retr_as_buffer(coredump)
                         .context("Unable to download coredump")?;
@@ -113,19 +113,17 @@ impl Executor for Coredump {
                         .stdout(Stdio::inherit())
                         .stderr(Stdio::inherit());
 
-                    if verbose > 0 {
-                        println!("{} {command:?}", "Parsing coredump:".blue());
-                    }
+                    info!("{}: {command:?}", "Parsing coredump".blue());
 
                     if !command.status()?.success() {
                         bail!("vita-parse-core failed");
                     }
-                } else if verbose > 0 {
-                    println!("{}", "No coredump files found.".yellow())
+                } else {
+                    warn!("{}", "No coredump files found.".yellow())
                 }
             }
             CoredumpCmd::Clean(args) => {
-                let mut ftp = ftp::connect(&args.connection, verbose)?;
+                let mut ftp = ftp::connect(&args.connection)?;
                 ftp.cwd("ux0:/data/")
                     .context("Unable to cwd to ux0:/data/")?;
 
@@ -134,9 +132,7 @@ impl Executor for Coredump {
 
                 for file in find_core_dumps(&files) {
                     counter += 1;
-                    if verbose > 0 {
-                        println!("{} {file}", "Deleting file:".blue())
-                    }
+                    info!("{}: {file}", "Deleting file".blue());
 
                     match ftp.rm(file) {
                         Ok(_) => {}
@@ -146,8 +142,8 @@ impl Executor for Coredump {
                     }
                 }
 
-                if counter == 0 && verbose > 0 {
-                    println!("{}", "No coredump files found.".yellow())
+                if counter == 0 {
+                    warn!("{}", "No coredump files found.".yellow())
                 }
             }
         }

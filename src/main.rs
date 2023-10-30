@@ -8,16 +8,31 @@ use check::check_rust_version;
 use clap::Parser;
 use colored::Colorize;
 use commands::{Cargo, Executor};
+use log::error;
 
 fn main() {
-    check_rust_version();
     let _ = check::set_cargo_config_env();
 
     let Cargo::Input(input) = Cargo::parse();
-    match input.cmd.execute(1 + input.verbose - input.quiet as u8) {
+
+    env_logger::Builder::new()
+        .format_timestamp(None)
+        .format_target(false)
+        .filter_level(match (input.quiet, input.verbose) {
+            (true, _) => log::LevelFilter::Error,
+            (false, 0) => log::LevelFilter::Info,
+            (false, 1) => log::LevelFilter::Debug,
+            (false, _) => log::LevelFilter::Trace,
+        })
+        .init();
+
+    check_rust_version();
+
+    let Cargo::Input(input) = Cargo::parse();
+    match input.cmd.execute() {
         Ok(_) => {}
         Err(e) => {
-            eprintln!("{} {}", "Error:".bold().red(), format!("{e:?}").red());
+            error!("{}", format!("{e:?}").red());
             std::process::exit(1);
         }
     }
