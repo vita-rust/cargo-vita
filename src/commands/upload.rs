@@ -1,11 +1,12 @@
 use std::{fs::File, io::BufReader, path::Path};
 
-use crate::ftp;
-use ::ftp::FtpError;
 use anyhow::{bail, Context};
 use clap::Args;
 use colored::Colorize;
+use suppaftp::FtpError;
 use walkdir::WalkDir;
+
+use crate::ftp;
 
 use super::{ConnectionArgs, Executor};
 
@@ -53,7 +54,7 @@ impl Executor for Upload {
                 );
             }
 
-            ftp.put(
+            ftp.put_file(
                 &destination,
                 &mut BufReader::new(File::open(source).context("Unable to open source file")?),
             )
@@ -79,7 +80,7 @@ impl Executor for Upload {
                         );
                     }
 
-                    ftp.put(
+                    ftp.put_file(
                         &destination,
                         &mut BufReader::new(
                             File::open(source_path).context("Unable to open source file")?,
@@ -99,8 +100,9 @@ impl Executor for Upload {
                         }
                         match ftp.mkdir(&destination) {
                             Ok(_) => {}
-                            Err(FtpError::InvalidResponse(e))
-                                if e.starts_with("226 Directory created.") => {}
+                            Err(FtpError::UnexpectedResponse(e))
+                                if String::from_utf8_lossy(&e.body)
+                                    .starts_with("226 Directory created.") => {}
                             Err(e) => {
                                 if verbose > 1 {
                                     eprintln!(

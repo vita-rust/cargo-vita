@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use anyhow::Context;
 use colored::Colorize;
-use ftp::FtpStream;
+use suppaftp::FtpStream;
 
 use crate::commands::ConnectionArgs;
 
