@@ -11,10 +11,10 @@ pub struct Reboot {
 }
 
 impl Executor for Reboot {
-    fn execute(&self, verbose: u8) -> anyhow::Result<()> {
+    fn execute(&self) -> anyhow::Result<()> {
         let ip = &self.connection.vita_ip;
         let port = self.connection.cmd_port;
-        nc(verbose, ip, port, "reboot")?;
+        nc(ip, port, "reboot")?;
 
         Ok(())
     }

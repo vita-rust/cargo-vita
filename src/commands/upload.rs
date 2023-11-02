@@ -3,6 +3,7 @@ use std::{fs::File, io::BufReader, path::Path};
 use anyhow::{bail, Context};
 use clap::Args;
 use colored::Colorize;
+use log::{debug, info};
 use suppaftp::FtpError;
 use walkdir::WalkDir;
 
@@ -25,13 +26,13 @@ pub struct Upload {
 }
 
 impl Executor for Upload {
-    fn execute(&self, verbose: u8) -> anyhow::Result<()> {
+    fn execute(&self) -> anyhow::Result<()> {
         let source = Path::new(&self.source);
         if !source.exists() {
             bail!("Source path does not exist");
         }
 
-        let mut ftp = ftp::connect(&self.connection, verbose)?;
+        let mut ftp = ftp::connect(&self.connection)?;
 
         let destination = if self.destination.ends_with('/') {
             format!(
@@ -47,12 +48,11 @@ impl Executor for Upload {
         };
 
         if source.is_file() {
-            if verbose > 0 {
-                println!(
-                    "{}",
-                    format!("Uploading {source:?} to {destination}").blue()
-                );
-            }
+            info!(
+                "{} {source:?} {} {destination}",
+                "Uploading".blue(),
+                "to".blue(),
+            );
 
             ftp.put_file(
                 &destination,
@@ -73,12 +73,11 @@ impl Executor for Upload {
                 );
 
                 if file.file_type().is_file() {
-                    if verbose > 0 {
-                        println!(
-                            "{}",
-                            format!("Uploading {source_path:?} to {destination}").blue()
-                        );
-                    }
+                    info!(
+                        "{} {source_path:?} {} {destination}",
+                        "Uploading".blue(),
+                        "to".blue(),
+                    );
 
                     ftp.put_file(
                         &destination,
@@ -93,23 +92,20 @@ impl Executor for Upload {
                     }
 
                     // For some reason doing multiple cwd in a single connection breaks vitacompanion,
-                    // So we'll skip directory creation errors.
+                    // Some of these errors are benign (e.g. when a directory already exists),
+                    // so if an error happens it does not return Err, just print a debug log.
                     if ftp.cwd(&destination).is_err() {
-                        if verbose > 0 {
-                            println!("{} {destination}", "Creating directory".blue());
-                        }
+                        info!("{} {destination}", "Creating directory".blue());
                         match ftp.mkdir(&destination) {
                             Ok(_) => {}
                             Err(FtpError::UnexpectedResponse(e))
                                 if String::from_utf8_lossy(&e.body)
                                     .starts_with("226 Directory created.") => {}
                             Err(e) => {
-                                if verbose > 1 {
-                                    eprintln!(
-                                        "{} {destination}, {e}",
-                                        "Unable to create directory: ".red()
-                                    );
-                                }
+                                debug!(
+                                    "{}: {destination}, {e}",
+                                    "Unable to create directory ".red()
+                                );
                             }
                         };
                     }

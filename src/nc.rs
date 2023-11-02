@@ -5,11 +5,11 @@ use std::{
 
 use anyhow::Context;
 use colored::Colorize;
+use log::info;
 
-pub fn nc(verbose: u8, ip: &str, port: u16, command: &str) -> anyhow::Result<()> {
-    if verbose > 0 {
-        println!("{} {ip}:{port} -> {command}", "Sending command to".blue());
-    }
+pub fn nc(ip: &str, port: u16, command: &str) -> anyhow::Result<()> {
+    info!("{} {ip}:{port} -> {command}", "Sending command to".blue());
+
     let mut stream =
         TcpStream::connect((ip, port)).context("Unable to connect to command server")?;
     let command = format!("{}\n", command);
@@ -21,9 +21,8 @@ pub fn nc(verbose: u8, ip: &str, port: u16, command: &str) -> anyhow::Result<()>
     stream
         .read_to_string(&mut response)
         .context("Unable to read output")?;
-    if verbose > 0 {
-        println!("{} {}", "Server response:".yellow(), response);
-    }
+
+    info!("{}: {}", "Server response".yellow(), response);
 
     Ok(())
 }
