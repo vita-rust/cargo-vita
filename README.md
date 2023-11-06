@@ -6,7 +6,7 @@
 
 Cargo command to work with Sony PlayStation Vita rust project binaries.
 
-For general guidelines see [vita-rust book](https://vita-rust.github.io/book)
+For general guidelines see [vita-rust book](https://vita-rust.github.io/book).
 
 ## Requirements
 
@@ -84,7 +84,7 @@ vita_mksfoex_flags = ["-d", "ATTRIBUTE2=12"]
 
 ## Examples
 
-```
+```sh
 # Build all current/all workspace projects in release mode as vpk
 cargo vita build vpk -- --release
 
@@ -100,6 +100,70 @@ cargo vita build eboot --update --run -- --release
 # Start a TCP server and listen for logs. Send a termination signal to stop (e.g. ctrl+c)
 cargo vita logs
 ```
+
+## Additional tools
+
+For a better development experience it is recommended to install additional modules on your Vita.
+
+### vitacompanion
+
+When enabled, this module keeps a FTP server on your Vita running on port `1337`, as well as a TCP command server running on port `1338`.
+
+- The FTP server allows you to easily upload `vpk` and `eboot` files to your Vita. This is FTP server is used by `cargo-vita` for the following commands and flags:
+
+  ```sh
+  # Builds a eboot.bin, and uploads it to ux0:/app/TITLEID/eboot.bin
+  cargo vita build eboot --update
+
+  # Builds a vpk, and uploads it to ux0:/download/project_name.vpk
+  cargo vita build vpk --upload
+
+  # Recursively upload ~/test to ux0:/download
+  cargo vita upload -s ~/test -d ux0:/download/
+  ```
+
+- The command server allows you to kill and launch applications and reboot your Vita:
+
+  ```sh
+  # Reboot your Vita
+  cargo vita reboot
+
+  # After uploading the eboot.bin this command will kill the current app,
+  # and launch your TITLEID
+  cargo vita build eboot --update --run
+  ```
+
+### PrincessLog
+
+This module allows capturing stdout and stderr from your Vita.
+In order to capture the logs you need to start a TCP server on your computer, and configure
+PrincessLog to connect to it.
+
+For convenience `cargo-vita` provides two commands to work with logs:
+
+  - A command to start a TCP server Vita will connect to:
+
+    ```sh
+    # Start a TCP server on 0.0.0.0, and print all bytes received via the socket to stdout
+    cargo vita logs
+    ```
+  - A command to reconfigure PrincessLog with the new ip/port. This will use
+    the FTP server provided by `vitacompanion` to upload a new config.
+    If an IP address of your machine is not explicitly provided, it will be guessed
+    using [local-ip-address](https://crates.io/crates/local-ip-address) crate.
+    When a configuration file is updated, the changes are not applied until Vita is rebooted.
+
+    ```sh
+    # Generate and upload a new config for PrincessLog to your Vita.
+    # Will guess a local IP address of the machine where this command is executed.
+    # After reconfiguration reboots the Vita.
+    cargo vita logs configure && cargo vita reboot
+
+
+    # Explicitly sets the IP address Vita will connect to.
+    # Also enables kernel debug messages in the log.
+    cargo vita logs configure --host-ip-address 10.10.10.10 --kernel-debug
+    ```
 
 ## License
 

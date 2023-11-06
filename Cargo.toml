@@ -27,14 +27,4 @@ suppaftp = { version = "5.2.1" }
 tee = "0.1.0"
 tempfile = "3.8.0"
 walkdir = "2.4.0"
-
-[package.metadata.vita]
-title_id = "VITASHELL"
-title_name = "Test app"
-assets = "static"
-# You can choose a subset of std or use panic_abort if you don't need unwinding
-build_std = "std,panic_unwind"
-# You can provide a custom JSON file spec
-vita_strip_flags = ["-g"]
-vita_make_fself_flags = ["-s"]
-vita_mksfoex_flags = ["-d", "ATTRIBUTE2=12"]
+local-ip-address = "0.5.6"
