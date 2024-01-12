@@ -18,7 +18,8 @@ pub fn check_rust_version() {
             - Run cargo with +nightly flag.\n \
             - Create a rust-toolchain.toml in the root with the following content:\n   \
               [toolchain]\n   \
-              channel = \"nightly\""
+              channel = \"nightly\"\n   \
+              components = [ \"rust-src\" ]"
         );
         process::exit(1);
     }
