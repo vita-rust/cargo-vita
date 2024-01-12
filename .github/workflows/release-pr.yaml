@@ -1,0 +1,58 @@
+name: Create a release PR
+
+permissions:
+  pull-requests: write
+  contents: write
+  
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        type: choice
+        description: Version update
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub token
+        uses: actions/create-github-app-token@v1
+        id: generate-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.generate-token.outputs.token }}
+      - name: Install cargo-edit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-workspaces,git-cliff
+      - id: bump
+        name: Update version
+        run: |
+          cargo workspaces version --force cargo-vita ${{ inputs.version }} -ay --no-git-commit;
+          cat Cargo.toml | grep ^version\ = | sed 's/[" ]//g' >> "$GITHUB_OUTPUT"
+      - name: Update changelog
+        run: git cliff -t v${{ steps.bump.outputs.version }} -u --prepend CHANGELOG.md
+      - id: changelog
+        name: Generate a changelog for PR body
+        run: git cliff -t v${{ steps.bump.outputs.version }} -u -o .CHANGELOG.md --strip footer
+        env: 
+          GIT_CLIFF__CHANGELOG__HEADER: "# Changelog\n\n"
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ steps.generate-token.outputs.token }}
+          title: Release v${{ steps.bump.outputs.version }}
+          commit-message: Release v${{ steps.bump.outputs.version }}
+          body-path: .CHANGELOG.md
+          branch: release
+          labels: release
+          delete-branch: true

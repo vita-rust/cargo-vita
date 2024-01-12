@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 authors = ["vita-sdk", "Nikolay Arhipov <n@arhipov.net>"]
 keywords = ["vita", "homebrew"]
 categories = ["command-line-utilities", "development-tools::cargo-plugins"]
-exclude = [".github", ".vscode", "target"]
+exclude = [".github", ".vscode", "target", "cliff.toml"]
 
 [dependencies]
 anyhow = { version = "1.0.75", features = ["backtrace"] }
