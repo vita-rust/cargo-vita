@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  release:
+    types: [published]
+
+env:
+  RUSTFLAGS: -D warnings
+
+jobs:
+  release:
+    if: github.repository_owner == 'vita-rust'
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-20.04
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-20.04
+            c: true
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-20.04
+            c: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-20.04
+            c: true
+    name: GitHub Release (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: rust-toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - name: "`cargo build --release`"
+        if: "!matrix.c"
+        run: cargo build --release --target ${{ matrix.target }}
+      - name: '`cargo zigbuild --release`'
+        if: "matrix.c"
+        run: |
+          pip3 install cargo-zigbuild
+          cargo zigbuild --release --target ${{ matrix.target }}
+      - name: Create an asset
+        id: asset
+        run: |
+          if ${{ contains(matrix.target, 'pc-windows') }}; then
+            EXE=.exe
+          fi
+          EXECUTABLE="./target/${{ matrix.target }}/release/${GITHUB_REPOSITORY#*/}$EXE"
+          ASSET_STEM="${GITHUB_REPOSITORY#*/}-${GITHUB_REF#refs/tags/}-${{ matrix.target }}"
+          git archive -o "./$ASSET_STEM.tar" --prefix "$ASSET_STEM/" HEAD
+          tar -xf "./$ASSET_STEM.tar"
+          mv "$EXECUTABLE" "./$ASSET_STEM/"
+          if ${{ contains(matrix.target, 'pc-windows') }}; then
+            ASSET="./$ASSET_STEM.zip"
+            7z a "$ASSET" "./$ASSET_STEM"
+            zipinfo "$ASSET"
+          else
+            ASSET="./$ASSET_STEM.tar.gz"
+            tar -czvf "$ASSET" "./$ASSET_STEM"
+          fi
+          echo "asset=$ASSET" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: GH Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.asset.outputs.asset }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: rust-toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - name: publish
+        run: cargo publish --token ${CRATES_TOKEN}
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
