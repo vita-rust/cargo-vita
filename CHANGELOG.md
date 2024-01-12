@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2024-01-12
+### Details
+#### Changed
+- Replaced unmaintained ftp crate with its fork suppaftp (#8)
+- Use log crate for cargo-vita output (#7)
+- Disabled no-log feature of suppaftp
+- Added logs sumbcommand to edit PrincessLog config remotely (#10)
+- Add rust-src component to recommended rust-toolchain.toml (#11)
+- Added CI jobs for CD (#12)
+- Added dependabot.yml
+- Updated dependecies
+
+#### Fixed
+- Fixed name of the publish job
+
+
 ## [0.1.11] - 2024-01-12
 ### Details
 #### Changed
