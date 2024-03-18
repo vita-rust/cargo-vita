@@ -25,7 +25,7 @@ jobs:
         run: echo "${{ github.event.pull_request.title }}" | awk '{print "name="  $2}' >> "$GITHUB_OUTPUT"
       - name: Push a new tag
         id: tag_version
-        uses: mathieudutour/github-tag-action@v6.1
+        uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ steps.generate-token.outputs.token }}
           custom_tag: ${{ steps.tag.outputs.name }}
