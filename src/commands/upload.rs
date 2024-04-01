@@ -60,7 +60,10 @@ impl Executor for Upload {
             )
             .context("Uploading file failed")?;
         } else if source.is_dir() {
-            for file in WalkDir::new(source).into_iter().filter_map(|e| e.ok()) {
+            for file in WalkDir::new(source)
+                .into_iter()
+                .filter_map(std::result::Result::ok)
+            {
                 let source_path = file.path();
 
                 let destination = format!(
@@ -97,7 +100,7 @@ impl Executor for Upload {
                     if ftp.cwd(&destination).is_err() {
                         info!("{} {destination}", "Creating directory".blue());
                         match ftp.mkdir(&destination) {
-                            Ok(_) => {}
+                            Ok(()) => {}
                             Err(FtpError::UnexpectedResponse(e))
                                 if String::from_utf8_lossy(&e.body)
                                     .starts_with("226 Directory created.") => {}

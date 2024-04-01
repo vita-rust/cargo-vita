@@ -8,8 +8,8 @@ use anyhow::{anyhow, Context};
 use log::error;
 use rustc_version::Channel;
 
-pub fn check_rust_version() {
-    let rust_version = rustc_version::version_meta().unwrap();
+pub fn rust_version() -> anyhow::Result<()> {
+    let rust_version = rustc_version::version_meta()?;
 
     if rust_version.channel > Channel::Nightly {
         error!(
@@ -23,6 +23,8 @@ pub fn check_rust_version() {
         );
         process::exit(1);
     }
+
+    Ok(())
 }
 
 pub fn set_cargo_config_env() -> anyhow::Result<()> {

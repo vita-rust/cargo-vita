@@ -31,5 +31,7 @@ local-ip-address = "0.6.1"
 
 [lints.clippy]
 pedantic = { level = "deny", priority = -1 }
+module_name_repetitions = "allow"
+similar_names = "allow"
 unwrap_used = "deny"
 expect_used = "deny"

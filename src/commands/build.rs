@@ -6,7 +6,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::ftp;
+use crate::{check, ftp};
 use anyhow::{bail, Context};
 use cargo_metadata::{camino::Utf8PathBuf, Artifact, Message, Package};
 use clap::{Args, Subcommand};
@@ -37,7 +37,7 @@ pub struct Build {
     #[arg(allow_hyphen_values = true)]
     #[arg(global = true)]
     #[arg(name = "CARGO_ARGS")]
-    build_args: Vec<String>,
+    cargo_args: Vec<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -131,6 +131,8 @@ impl ExecutableArtifact {
 
 impl Executor for Build {
     fn execute(&self) -> anyhow::Result<()> {
+        check::rust_version()?;
+
         let ctx = BuildContext::new(self)?;
 
         match &self.cmd {
@@ -154,7 +156,7 @@ impl Executor for Build {
 
                 if args.update {
                     let files = ctx.eboot_uploads(&artifacts)?;
-                    ctx.upload(&files, &args.connection.clone().required()?)?;
+                    upload(&files, &args.connection.clone().required()?)?;
                 }
 
                 if args.run {
@@ -188,7 +190,7 @@ impl Executor for Build {
                 }
 
                 if !upload_files.is_empty() {
-                    ctx.upload(&upload_files, &args.eboot.connection.clone().required()?)?;
+                    upload(&upload_files, &args.eboot.connection.clone().required()?)?;
                 }
 
                 if args.eboot.run {
@@ -240,7 +242,7 @@ impl<'a> BuildContext<'a> {
             .arg(VITA_TARGET)
             .arg("--message-format")
             .arg("json-render-diagnostics")
-            .args(&self.command.build_args)
+            .args(&self.command.cargo_args)
             .stdin(Stdio::inherit())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
@@ -399,7 +401,7 @@ impl<'a> BuildContext<'a> {
 
             let files = WalkDir::new(&assets)
                 .into_iter()
-                .filter_map(|e| e.ok())
+                .filter_map(std::result::Result::ok)
                 .filter(|e| e.file_type().is_file());
 
             for file in files {
@@ -429,6 +431,7 @@ impl<'a> BuildContext<'a> {
         Ok(())
     }
 
+    #[allow(clippy::unused_self)]
     fn vpk_uploads(
         &self,
         artifacts: &[ExecutableArtifact],
@@ -472,24 +475,6 @@ impl<'a> BuildContext<'a> {
             .collect::<anyhow::Result<Vec<_>>>()
     }
 
-    fn upload(&self, files: &[(Utf8PathBuf, String)], conn: &ConnectionArgs) -> anyhow::Result<()> {
-        if files.is_empty() {
-            return Ok(());
-        }
-
-        let mut ftp = ftp::connect(conn)?;
-
-        for (src, dest) in files {
-            info!("{} {src} {} {dest}", "Uploading".blue(), "file to".blue());
-
-            let src = File::open(src).context("Unable to open source file")?;
-            ftp.put_file(dest, &mut BufReader::new(src))
-                .context("Failed to upload file")?;
-        }
-
-        Ok(())
-    }
-
     fn run(&self, artifacts: &[ExecutableArtifact], conn: &ConnectionArgs) -> anyhow::Result<()> {
         if let Some(art) = artifacts.last() {
             let title_id = art
@@ -509,6 +494,24 @@ impl<'a> BuildContext<'a> {
 
         Ok(())
     }
+}
+
+fn upload(files: &[(Utf8PathBuf, String)], conn: &ConnectionArgs) -> anyhow::Result<()> {
+    if files.is_empty() {
+        return Ok(());
+    }
+
+    let mut ftp = ftp::connect(conn)?;
+
+    for (src, dest) in files {
+        info!("{} {src} {} {dest}", "Uploading".blue(), "file to".blue());
+
+        let src = File::open(src).context("Unable to open source file")?;
+        ftp.put_file(dest, &mut BufReader::new(src))
+            .context("Failed to upload file")?;
+    }
+
+    Ok(())
 }
 
 trait CommandExt {

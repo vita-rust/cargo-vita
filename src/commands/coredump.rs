@@ -119,7 +119,7 @@ impl Executor for Coredump {
                         bail!("vita-parse-core failed");
                     }
                 } else {
-                    warn!("{}", "No coredump files found.".yellow())
+                    warn!("{}", "No coredump files found.".yellow());
                 }
             }
             CoredumpCmd::Clean(args) => {
@@ -135,7 +135,7 @@ impl Executor for Coredump {
                     info!("{}: {file}", "Deleting file".blue());
 
                     match ftp.rm(file) {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(FtpError::UnexpectedResponse(e))
                             if String::from_utf8_lossy(&e.body).contains("226 File deleted") => {}
                         Err(e) => return Err(e).context("Unable to delete file"),
@@ -143,7 +143,7 @@ impl Executor for Coredump {
                 }
 
                 if counter == 0 {
-                    warn!("{}", "No coredump files found.".yellow())
+                    warn!("{}", "No coredump files found.".yellow());
                 }
             }
         }
