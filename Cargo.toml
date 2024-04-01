@@ -18,7 +18,7 @@ clap = { version = "4.4.2", features = ["derive", "env"] }
 colored = "2.0.4"
 either = "1.9.0"
 enum_dispatch = "0.3.12"
-env_logger = "0.10.0"
+env_logger = "0.11.3"
 log = "0.4.20"
 rustc_version = "0.4.0"
 serde = { version = "1.0.188", features = ["derive"] }
@@ -27,4 +27,4 @@ suppaftp = { version = "5.2.1" }
 tee = "0.1.0"
 tempfile = "3.8.0"
 walkdir = "2.4.0"
-local-ip-address = "0.5.6"
+local-ip-address = "0.6.1"
