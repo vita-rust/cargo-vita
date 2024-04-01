@@ -28,3 +28,8 @@ tee = "0.1.0"
 tempfile = "3.8.0"
 walkdir = "2.4.0"
 local-ip-address = "0.6.1"
+
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"

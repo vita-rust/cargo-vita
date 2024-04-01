@@ -42,6 +42,8 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
       - name: "`cargo check`"
         run: cargo check --all-targets --all-features
+      - name: "`cargo deny`"
+        run: cargo deny check
       - name: "`cargo test`"
         run: cargo test --no-fail-fast --verbose --locked
   clippy:
