@@ -42,17 +42,16 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
       - name: "`cargo check`"
         run: cargo check --all-targets --all-features
-      - name: "`cargo deny`"
-        uses: EmbarkStudios/cargo-deny-action@v1
       - name: "`cargo test`"
         run: cargo test --no-fail-fast --verbose --locked
-  clippy:
-    name: Clippy
+  analyze:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: rust-toolchain
         uses: dtolnay/rust-toolchain@stable
+      - name: "`cargo deny`"
+        uses: EmbarkStudios/cargo-deny-action@v1
       - name: "`cargo clippy`"
         run: cargo clippy --all-targets --all-features
