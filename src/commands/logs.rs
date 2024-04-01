@@ -90,9 +90,10 @@ impl PrincessLogConfig {
     }
 
     fn serialize(&self) -> Vec<u8> {
-        let flags = match self.kernel_debug {
-            true => NLM_CONFIG_FLAGS_BIT_QAF_DEBUG_PRINTF,
-            false => 0,
+        let flags = if self.kernel_debug {
+            NLM_CONFIG_FLAGS_BIT_QAF_DEBUG_PRINTF
+        } else {
+            0
         };
 
         let mut res = Vec::with_capacity(16);
@@ -120,18 +121,24 @@ impl Logs {
                 info!("{}", "Found existing config".blue());
 
                 match PrincessLogConfig::parse(&mut file) {
-                    Ok(c) => match c.magic == MAGIC {
-                        true => info!(
-                            "{} {ip}:{port} {} {kdbg}",
-                            "Existing config has address".yellow(),
-                            "and kernel debug print is".yellow(),
-                            ip = c.ip,
-                            port = c.port,
-                            kdbg = c.kernel_debug
-                        ),
-                        false => warn!("{}", "Existing config has invalid magic".red()),
-                    },
-                    Err(err) => warn!("{}: {err}", "Failed to parse existing config".red()),
+                    Ok(c) => {
+                        if c.magic == MAGIC {
+                            info!(
+                                "{} {ip}:{port} {} {kdbg}",
+                                "Existing config has address".yellow(),
+                                "and kernel debug print is".yellow(),
+                                ip = c.ip,
+                                port = c.port,
+                                kdbg = c.kernel_debug
+                            );
+                        } else {
+                            warn!("{}", "Existing config has invalid magic".red());
+                        }
+                    }
+
+                    Err(err) => {
+                        warn!("{}: {err}", "Failed to parse existing config".red());
+                    }
                 };
             }
             Err(err) => {
@@ -191,7 +198,7 @@ impl Logs {
                                     break;
                                 }
                                 Ok(bytes_read) => {
-                                    print!("{}", String::from_utf8_lossy(&buffer[..bytes_read]))
+                                    print!("{}", String::from_utf8_lossy(&buffer[..bytes_read]));
                                 }
                                 Err(e) => {
                                     error!("{}: {}", "Error reading from client", e);

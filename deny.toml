@@ -1,0 +1,45 @@
+[graph]
+targets = [
+    "x86_64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+]
+all-features = true
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+[advisories]
+version = 2
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+
+[licenses]
+version = 2
+private = { ignore = true }
+allow = ["MIT", "Apache-2.0", "MPL-2.0", "BSD-3-Clause", "Zlib"]
+confidence-threshold = 0.9
+exceptions = [{ name = "unicode-ident", allow = ["Unicode-DFS-2016"] }]
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+highlight = "simplest-path"
+workspace-default-features = "allow"
+external-default-features = "allow"
+allow-wildcard-paths = true
+
+skip = [
+    { name = "syn", version = "1.0.109", reason = "local-ip-address" },
+    { name = "windows-sys", version = "0.48.0", reason = "local-ip-address and colored" },
+    { name = "windows_x86_64_msvc", version = "0.48.5", reason = "local-ip-address and colored" },
+    { name = "windows_x86_64_gnu", version = "0.48.5", reason = "local-ip-address and colored" },
+    { name = "windows-targets", version = "0.48.5", reason = "local-ip-address and colored" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

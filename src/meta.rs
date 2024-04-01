@@ -92,9 +92,9 @@ pub struct PackageMetadata {
 impl Default for PackageMetadata {
     fn default() -> Self {
         Self {
-            title_id: Default::default(),
-            title_name: Default::default(),
-            assets: Default::default(),
+            title_id: None,
+            title_name: None,
+            assets: None,
             build_std: default_build_std(),
             vita_strip_flags: default_vita_strip_flags(),
             vita_make_fself_flags: default_vita_make_fself_flags(),
@@ -112,7 +112,7 @@ pub fn parse_crate_metadata(
 
     let pkg = match artifact {
         Some(artifact) => meta.packages.iter().find(|p| p.id == artifact.package_id),
-        None => meta.workspace_default_packages().first().cloned(),
+        None => meta.workspace_default_packages().first().copied(),
     };
 
     if let Some(pkg) = pkg {
@@ -126,5 +126,9 @@ pub fn parse_crate_metadata(
         }
     }
 
-    Ok((Default::default(), pkg.cloned(), meta.target_directory))
+    Ok((
+        PackageMetadata::default(),
+        pkg.cloned(),
+        meta.target_directory,
+    ))
 }
