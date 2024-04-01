@@ -401,7 +401,7 @@ impl<'a> BuildContext<'a> {
 
             let files = WalkDir::new(&assets)
                 .into_iter()
-                .filter_map(std::result::Result::ok)
+                .filter_map(Result::ok)
                 .filter(|e| e.file_type().is_file());
 
             for file in files {

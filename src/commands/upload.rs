@@ -60,10 +60,7 @@ impl Executor for Upload {
             )
             .context("Uploading file failed")?;
         } else if source.is_dir() {
-            for file in WalkDir::new(source)
-                .into_iter()
-                .filter_map(std::result::Result::ok)
-            {
+            for file in WalkDir::new(source).into_iter().filter_map(Result::ok) {
                 let source_path = file.path();
 
                 let destination = format!(
