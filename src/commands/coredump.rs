@@ -115,7 +115,19 @@ impl Executor for Coredump {
 
                     info!("{}: {command:?}", "Parsing coredump".blue());
 
-                    if !command.status()?.success() {
+                    let status = command.status();
+
+                    if let Err(err) = &status {
+                        if err.kind() == io::ErrorKind::NotFound {
+                            bail!(
+                                "`vita-parse-core` not found. \
+                                Ensure this tool is installed from https://github.com/xyzz/vita-parse-core \
+                                and is available in your PATH."
+                            );
+                        }
+                    }
+
+                    if !status?.success() {
                         bail!("vita-parse-core failed");
                     }
                 } else {

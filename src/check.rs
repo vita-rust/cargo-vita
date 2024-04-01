@@ -1,18 +1,17 @@
 use std::{
     collections::HashMap,
     env,
-    process::{self, Command, Stdio},
+    process::{Command, Stdio},
 };
 
-use anyhow::{anyhow, Context};
-use log::error;
+use anyhow::{anyhow, bail, Context};
 use rustc_version::Channel;
 
 pub fn rust_version() -> anyhow::Result<()> {
     let rust_version = rustc_version::version_meta()?;
 
     if rust_version.channel > Channel::Nightly {
-        error!(
+        bail!(
             "cargo-vita requires a nightly rustc version. Do one of the following:\n \
             - Run `rustup override set nightly` to use nightly in the current directory\n \
             - Run cargo with +nightly flag.\n \
@@ -21,7 +20,6 @@ pub fn rust_version() -> anyhow::Result<()> {
               channel = \"nightly\"\n   \
               components = [ \"rust-src\" ]"
         );
-        process::exit(1);
     }
 
     Ok(())
