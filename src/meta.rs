@@ -58,6 +58,10 @@ impl FromStr for TitleId {
     }
 }
 
+fn default_strip() -> bool {
+    true
+}
+
 fn default_build_std() -> String {
     "std,panic_unwind".to_string()
 }
@@ -81,6 +85,8 @@ pub struct PackageMetadata {
     pub assets: Option<String>,
     #[serde(default = "default_build_std")]
     pub build_std: String,
+    #[serde(default = "default_strip")]
+    pub strip: bool,
     #[serde(default = "default_vita_strip_flags")]
     pub vita_strip_flags: Vec<String>,
     #[serde(default = "default_vita_make_fself_flags")]
@@ -96,6 +102,7 @@ impl Default for PackageMetadata {
             title_name: None,
             assets: None,
             build_std: default_build_std(),
+            strip: default_strip(),
             vita_strip_flags: default_vita_strip_flags(),
             vita_make_fself_flags: default_vita_make_fself_flags(),
             vita_mksfoex_flags: default_vita_mksfoex_flags(),
