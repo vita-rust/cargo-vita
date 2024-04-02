@@ -74,7 +74,7 @@ title_name = "My application"
 assets = "static"
 # Optional, this is the default
 build_std = "std,panic_unwind"
-# Optional, true by default. Will strip debug symbols from the resulting elf
+# Optional, true by default. Will strip debug symbols from the resulting elf when enabled.
 strip = true
 # Optional, this is the default
 vita_strip_flags = ["-g"]
