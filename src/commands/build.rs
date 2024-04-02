@@ -280,6 +280,11 @@ impl<'a> BuildContext<'a> {
     }
 
     fn strip(&self, art: &ExecutableArtifact) -> anyhow::Result<()> {
+        if !art.meta.strip {
+            info!("{}", "Skipping elf strip".yellow());
+            return Ok(());
+        }
+
         let mut command = Command::new(self.sdk_binary("arm-vita-eabi-strip"));
 
         command
