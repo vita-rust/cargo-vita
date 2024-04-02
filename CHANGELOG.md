@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2024-04-02
+### Details
+#### Changed
+- Bump peter-evans/create-pull-request from 5 to 6 (#15) by @dependabot[bot] in #15
+- Bump softprops/action-gh-release from 1 to 2 (#16) by @dependabot[bot] in #16
+- Bump mathieudutour/github-tag-action from 6.1 to 6.2 (#17) by @dependabot[bot] in #17
+- Added cargo-deny, enabled pedantic clippy, upgraded dependencies (#18) by @nikarh in #18
+- Added option to skip stripping elf (#20) by @nikarh in #20
+
+#### Fixed
+- Fixed publish pipeline permissions by @nikarh
+- Better error message when vita-parse-core is not found (#19) by @nikarh in #19
+
+
 ## [0.2.0] - 2024-01-12
 ### Details
 #### Changed
