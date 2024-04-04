@@ -58,16 +58,8 @@ impl FromStr for TitleId {
     }
 }
 
-fn default_strip() -> bool {
-    true
-}
-
 fn default_build_std() -> String {
     "std,panic_unwind".to_string()
-}
-
-fn default_vita_strip_flags() -> Vec<String> {
-    vec!["-g".to_string()]
 }
 
 fn default_vita_make_fself_flags() -> Vec<String> {
@@ -78,6 +70,7 @@ fn default_vita_mksfoex_flags() -> Vec<String> {
     vec!["-d".to_string(), "ATTRIBUTE2=12".to_string()]
 }
 
+
 #[derive(Deserialize, Debug)]
 pub struct PackageMetadata {
     pub title_id: Option<TitleId>,
@@ -85,14 +78,30 @@ pub struct PackageMetadata {
     pub assets: Option<String>,
     #[serde(default = "default_build_std")]
     pub build_std: String,
-    #[serde(default = "default_strip")]
-    pub strip: bool,
-    #[serde(default = "default_vita_strip_flags")]
-    pub vita_strip_flags: Vec<String>,
     #[serde(default = "default_vita_make_fself_flags")]
     pub vita_make_fself_flags: Vec<String>,
     #[serde(default = "default_vita_mksfoex_flags")]
     pub vita_mksfoex_flags: Vec<String>,
+
+    #[serde(default)]
+    pub dev: ProfileMetadata,
+    #[serde(default)]
+    pub release: ProfileMetadata,
+}
+
+impl PackageMetadata {
+    pub fn strip_symbols(&self, release: bool) -> bool {
+        if release {
+            self.release.strip_symbols.unwrap_or(true)
+        } else {
+            self.dev.strip_symbols.unwrap_or(false)
+        }
+    }
+}
+
+#[derive(Deserialize, Debug, Default)]
+pub struct ProfileMetadata {
+    pub strip_symbols: Option<bool>,
 }
 
 impl Default for PackageMetadata {
@@ -102,10 +111,10 @@ impl Default for PackageMetadata {
             title_name: None,
             assets: None,
             build_std: default_build_std(),
-            strip: default_strip(),
-            vita_strip_flags: default_vita_strip_flags(),
             vita_make_fself_flags: default_vita_make_fself_flags(),
             vita_mksfoex_flags: default_vita_mksfoex_flags(),
+            release: ProfileMetadata::default(),
+            dev: ProfileMetadata::default(),
         }
     }
 }
