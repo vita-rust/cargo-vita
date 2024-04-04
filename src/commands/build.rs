@@ -312,14 +312,13 @@ impl<'a> BuildContext<'a> {
     fn strip(&self, art: &ExecutableArtifact) -> anyhow::Result<()> {
         // Try to guess if the elf was built with debug or release profile.
         // This intentionally uses components() instead of as_str() to
-        // ensure that it works with operating systems that use a reverse slash for paths (Windows)
-        // as well as it works if for some reason the path to elf is not normalized.
+        // ensure that it works with operating systems that use a reverse slash for paths (Windows),
+        // as well as it works if the path is not normalized.
         let profile = art
             .elf
             .components()
             .skip_while(|s| s.as_str() != "armv7-sony-vita-newlibeabihf")
             .nth(1);
-
         let is_release = profile.map(|p| p.as_str()) == Some("release");
 
         if !art.meta.strip_symbols(is_release) {
