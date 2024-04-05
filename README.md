@@ -172,11 +172,11 @@ For convenience `cargo-vita` provides two commands to work with logs:
 
 ## Notes
 
-To produce the actual artifact runnable on the device, `cargo-vita` does multiple steps:
+To produce the actual artifact runnable on the device, `cargo-vita` does multiple steps[^vita-toolchain-readme]:
 
 1. Calls `cargo build` to build the code and link it to a `elf` file (using linker from [VitaSDK])
 2. Calls `vita-elf-create` from [VitaSDK] to transform the `elf` into Vita `elf` (`velf`)
-3. Calls `vita-make-fself` from [VitaSDK] to sign `velf` into `self` (aka `eboot`).
+3. Calls `vita-make-fself` from [VitaSDK] to make an unsigned `self` file (`fself`, aka `eboot`) from the `velf`.
 
 The second step of this process requires relocation segments in the elf.
 This means, that adding `strip=true` or `strip="symbols"` is not supported for Vita target,
@@ -203,10 +203,11 @@ Except where noted (below and/or in individual files), all code in this reposito
 * MIT License ([LICENSE-MIT](LICENSE-MIT) or [http://opensource.org/licenses/MIT](http://opensource.org/licenses/MIT))
 * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0))
 
-
 [vita-rust book]: https://vita-rust.github.io/book
 [VitaSDK]: https://vitasdk.org/
 [vitacompanion]: https://github.com/devnoname120/vitacompanion
 [PrincessLog]: https://github.com/CelesteBlue-dev/PSVita-RE-tools/tree/master/PrincessLog/build
 [vita-parse-core]: https://github.com/xyzz/vita-parse-core
 [local-ip-address]: https://crates.io/crates/local-ip-address
+
+[^vita-toolchain-readme]: https://github.com/vitasdk/vita-toolchain/blob/master/README.md
