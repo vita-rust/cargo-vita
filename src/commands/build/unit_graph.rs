@@ -3,7 +3,7 @@ use std::process::{Command, Stdio};
 use anyhow::Context;
 
 pub struct BuildHints {
-    // Can be "debug" or "release"
+    // Can be "dev" or "release", or any custom profile
     pub profile: String,
 
     // Can be "None", "debuginfo", "symbols", "true" or any invalid value

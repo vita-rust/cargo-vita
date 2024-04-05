@@ -79,10 +79,10 @@ vita_make_fself_flags = ["-s"]
 # Optional, this is the default
 vita_mksfoex_flags = ["-d", "ATTRIBUTE2=12"]
 
-[package.metadata.vita.dev]
+[package.metadata.vita.profile.dev]
 # Strips symbols from the vita elf in dev profile. Optional, default is false
 strip_symbols = true
-[package.metadata.vita.release]
+[package.metadata.vita.profile.release]
 # Strips symbols from the vita elf in release profile. Optional, default is true
 strip_symbols = true
 ```
@@ -184,13 +184,13 @@ since symbol stripping also strips relocation information.
 
 To counter this issue, `cargo-vita` can do an additional strip step of the `elf` with `--strip-unneeded` flag, which reduces the binary size without interfering with other steps necessary to produce a runnable binary.
 
-This step is enabled for release builds and disabled for dev builds by default, but can be configured per-crate via the following section in `Cargo.toml`:
+This step is enabled for release profile builds and disabled for other profile builds by default, but can be configured per-crate via the following section in `Cargo.toml`:
 
 ```toml
-[package.metadata.vita.dev]
+[package.metadata.vita.profile.dev]
 # Strips symbols from the vita elf in dev profile, default is false
 strip_symbols = true
-[package.metadata.vita.release]
+[package.metadata.vita.profile.release]
 # Strips symbols from the vita elf in release profile, default is true
 strip_symbols = true
 ```

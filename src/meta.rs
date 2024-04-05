@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::Deref, str::FromStr};
+use std::{collections::HashMap, fmt::Display, ops::Deref, str::FromStr};
 
 use anyhow::Context;
 use cargo_metadata::{camino::Utf8PathBuf, Artifact, MetadataCommand, Package};
@@ -83,18 +83,17 @@ pub struct PackageMetadata {
     pub vita_mksfoex_flags: Vec<String>,
 
     #[serde(default)]
-    pub dev: ProfileMetadata,
-    #[serde(default)]
-    pub release: ProfileMetadata,
+    pub profile: HashMap<String, ProfileMetadata>,
 }
 
 impl PackageMetadata {
-    pub fn strip_symbols(&self, release: bool) -> bool {
-        if release {
-            self.release.strip_symbols.unwrap_or(true)
-        } else {
-            self.dev.strip_symbols.unwrap_or(false)
-        }
+    pub fn strip_symbols(&self, profile: &str) -> bool {
+        let default = profile == "release";
+
+        self.profile
+            .get("release")
+            .and_then(|p| p.strip_symbols)
+            .unwrap_or(default)
     }
 }
 
@@ -112,8 +111,7 @@ impl Default for PackageMetadata {
             build_std: default_build_std(),
             vita_make_fself_flags: default_vita_make_fself_flags(),
             vita_mksfoex_flags: default_vita_mksfoex_flags(),
-            release: ProfileMetadata::default(),
-            dev: ProfileMetadata::default(),
+            profile: HashMap::new(),
         }
     }
 }
