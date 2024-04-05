@@ -70,7 +70,6 @@ fn default_vita_mksfoex_flags() -> Vec<String> {
     vec!["-d".to_string(), "ATTRIBUTE2=12".to_string()]
 }
 
-
 #[derive(Deserialize, Debug)]
 pub struct PackageMetadata {
     pub title_id: Option<TitleId>,
