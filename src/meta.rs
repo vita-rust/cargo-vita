@@ -91,7 +91,7 @@ impl PackageMetadata {
         let default = profile == "release";
 
         self.profile
-            .get("release")
+            .get(profile)
             .and_then(|p| p.strip_symbols)
             .unwrap_or(default)
     }
