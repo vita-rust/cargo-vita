@@ -6,14 +6,14 @@
 
 Cargo command to work with Sony PlayStation Vita rust project binaries.
 
-For general guidelines see [vita-rust book](https://vita-rust.github.io/book).
+For general guidelines see the [vita-rust book].
 
 ## Requirements
 
-- [VitaSDK](https://vitasdk.org/) must be installed, and `VITASDK` environment variable must point to its location.
-- [vitacompanion](https://github.com/devnoname120/vitacompanion) for ftp and command server (uploading and running artifacts)
-- [PrincessLog](https://github.com/CelesteBlue-dev/PSVita-RE-tools/tree/master/PrincessLog/build) is required for `cargo vita logs`
-- [vita-parse-core](https://github.com/xyzz/vita-parse-core) for `cargo vita coredump parse`
+- [VitaSDK] must be installed, and `VITASDK` environment variable must point to its location.
+- [vitacompanion] for FTP and command server (uploading and running artifacts)
+- [PrincessLog] is required for `cargo vita logs`
+- [vita-parse-core] for `cargo vita coredump parse`
 
 ## Installation
 
@@ -23,7 +23,7 @@ cargo +nightly install cargo-vita
 
 ## Usage
 
-Use the nightly toolchain to build Vita apps (either by using rustup override nightly for the project directory or by adding +nightly in the cargo invocation).
+Use the nightly toolchain to build Vita apps (either by using `rustup override nightly` for the project directory or by adding +nightly in the cargo invocation).
 
 
 ```
@@ -74,14 +74,17 @@ title_name = "My application"
 assets = "static"
 # Optional, this is the default
 build_std = "std,panic_unwind"
-# Optional, true by default. Will strip debug symbols from the resulting elf when enabled.
-strip = true
-# Optional, this is the default
-vita_strip_flags = ["-g"]
 # Optional, this is the default
 vita_make_fself_flags = ["-s"]
 # Optional, this is the default
 vita_mksfoex_flags = ["-d", "ATTRIBUTE2=12"]
+
+[package.metadata.vita.profile.dev]
+# Strips symbols from the vita elf in dev profile. Optional, default is false
+strip_symbols = true
+[package.metadata.vita.profile.release]
+# Strips symbols from the vita elf in release profile. Optional, default is true
+strip_symbols = true
 ```
 
 ## Examples
@@ -105,13 +108,13 @@ cargo vita logs
 
 ## Additional tools
 
-For a better development experience it is recommended to install additional modules on your Vita.
+For a better development experience, it is recommended to install the following modules on your Vita.
 
 ### vitacompanion
 
-When enabled, this module keeps a FTP server on your Vita running on port `1337`, as well as a TCP command server running on port `1338`.
+When enabled, this module keeps an FTP server on your Vita running on port `1337`, as well as a TCP command server running on port `1338`.
 
-- The FTP server allows you to easily upload `vpk` and `eboot` files to your Vita. This is FTP server is used by `cargo-vita` for the following commands and flags:
+- The FTP server allows you to easily upload `vpk` and `eboot` files to your Vita. This FTP server is used by `cargo-vita` for the following commands and flags:
 
   ```sh
   # Builds a eboot.bin, and uploads it to ux0:/app/TITLEID/eboot.bin
@@ -138,7 +141,7 @@ When enabled, this module keeps a FTP server on your Vita running on port `1337`
 ### PrincessLog
 
 This module allows capturing stdout and stderr from your Vita.
-In order to capture the logs you need to start a TCP server on your computer, and configure
+In order to capture the logs you need to start a TCP server on your computer and configure
 PrincessLog to connect to it.
 
 For convenience `cargo-vita` provides two commands to work with logs:
@@ -149,10 +152,10 @@ For convenience `cargo-vita` provides two commands to work with logs:
     # Start a TCP server on 0.0.0.0, and print all bytes received via the socket to stdout
     cargo vita logs
     ```
-  - A command to reconfigure PrincessLog with the new ip/port. This will use
+  - A command to reconfigure PrincessLog with the new IP/port. This will use
     the FTP server provided by `vitacompanion` to upload a new config.
     If an IP address of your machine is not explicitly provided, it will be guessed
-    using [local-ip-address](https://crates.io/crates/local-ip-address) crate.
+    using [local-ip-address] crate.
     When a configuration file is updated, the changes are not applied until Vita is rebooted.
 
     ```sh
@@ -167,6 +170,32 @@ For convenience `cargo-vita` provides two commands to work with logs:
     cargo vita logs configure --host-ip-address 10.10.10.10 --kernel-debug
     ```
 
+## Notes
+
+To produce the actual artifact runnable on the device, `cargo-vita` does multiple steps[^vita-toolchain-readme]:
+
+1. Calls `cargo build` to build the code and link it to a `elf` file (using linker from [VitaSDK])
+2. Calls `vita-elf-create` from [VitaSDK] to transform the `elf` into Vita `elf` (`velf`)
+3. Calls `vita-make-fself` from [VitaSDK] to make an unsigned `self` file (`fself`, aka `eboot`) from the `velf`.
+
+The second step of this process requires relocation segments in the elf.
+This means, that adding `strip=true` or `strip="symbols"` is not supported for Vita target,
+since symbol stripping also strips relocation information.
+
+To counter this issue, `cargo-vita` can do an additional strip step of the `elf` with `--strip-unneeded` flag, which reduces the binary size without interfering with other steps necessary to produce a runnable binary.
+
+This step is enabled for release profile builds and disabled for other profile builds by default, but can be configured per-crate via the following section in `Cargo.toml`:
+
+```toml
+[package.metadata.vita.profile.dev]
+# Strips symbols from the vita elf in dev profile, default is false
+strip_symbols = true
+[package.metadata.vita.profile.release]
+# Strips symbols from the vita elf in release profile, default is true
+strip_symbols = true
+```
+
+
 ## License
 
 Except where noted (below and/or in individual files), all code in this repository is dual-licensed at your option under either:
@@ -174,3 +203,11 @@ Except where noted (below and/or in individual files), all code in this reposito
 * MIT License ([LICENSE-MIT](LICENSE-MIT) or [http://opensource.org/licenses/MIT](http://opensource.org/licenses/MIT))
 * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0))
 
+[vita-rust book]: https://vita-rust.github.io/book
+[VitaSDK]: https://vitasdk.org/
+[vitacompanion]: https://github.com/devnoname120/vitacompanion
+[PrincessLog]: https://github.com/CelesteBlue-dev/PSVita-RE-tools/tree/master/PrincessLog/build
+[vita-parse-core]: https://github.com/xyzz/vita-parse-core
+[local-ip-address]: https://crates.io/crates/local-ip-address
+
+[^vita-toolchain-readme]: https://github.com/vitasdk/vita-toolchain/blob/master/README.md

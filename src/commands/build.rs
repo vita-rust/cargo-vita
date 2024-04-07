@@ -6,19 +6,21 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::{check, ftp};
+use crate::{check, commands::build::unit_graph::try_parse_unit_graph, ftp};
 use anyhow::{bail, Context};
 use cargo_metadata::{camino::Utf8PathBuf, Artifact, Message, Package};
-use clap::{Args, Subcommand};
+use clap::{command, Args, Subcommand};
 use colored::Colorize;
 use either::Either;
-use log::info;
+use log::{info, warn};
 use tee::TeeReader;
 use walkdir::WalkDir;
 
 use crate::meta::{parse_crate_metadata, PackageMetadata, TitleId, VITA_TARGET};
 
 use super::{ConnectionArgs, Executor, OptionalConnectionArgs, Run};
+
+mod unit_graph;
 
 #[derive(Args, Debug)]
 pub struct Build {
@@ -210,39 +212,47 @@ impl<'a> BuildContext<'a> {
         let rust_flags = env::var("RUSTFLAGS").unwrap_or_default()
             + " --cfg mio_unsupported_force_poll_poll --cfg mio_unsupported_force_waker_pipe";
 
-        let mut command = Command::new(cargo);
-
-        if let Ok(path) = env::var("PATH") {
-            let sdk_path = Path::new(&self.sdk).join("bin");
-            let path = format!("{}:{path}", sdk_path.display());
-            command.env("PATH", path);
-        }
-
-        // FIXME: move build-std to env/config.toml, since it is shared by all of the crates built
-        // This still works correctly when building only a single workspace crate though
+        // FIXME: move build-std to .cargo/config.toml, since it is shared by ALL of the crates built,
+        // but the metadata is per-crate. This still works correctly when building only a single workspace crate.
         let (meta, _, _) = parse_crate_metadata(None)?;
 
+        let command = || {
+            let mut command = Command::new(&cargo);
+
+            if let Ok(path) = env::var("PATH") {
+                let sdk_path = Path::new(&self.sdk).join("bin");
+                let path = format!("{}:{path}", sdk_path.display());
+                command.env("PATH", path);
+            }
+
+            command
+                .env("RUSTFLAGS", &rust_flags)
+                .env("TARGET_CC", "arm-vita-eabi-gcc")
+                .env("TARGET_CXX", "arm-vita-eabi-g++")
+                .pass_path_env("OPENSSL_LIB_DIR", || self.sdk("arm-vita-eabi").join("lib"))
+                .pass_path_env("OPENSSL_INCLUDE_DIR", || {
+                    self.sdk("arm-vita-eabi").join("include")
+                })
+                .pass_path_env("PKG_CONFIG_PATH", || {
+                    self.sdk("arm-vita-eabi").join("lib").join("pkgconfig")
+                })
+                .pass_env("PKG_CONFIG_SYSROOT_DIR", || &self.sdk)
+                .env("VITASDK", &self.sdk)
+                .arg("build")
+                .arg("-Z")
+                .arg(format!("build-std={}", &meta.build_std))
+                .arg("--target")
+                .arg(VITA_TARGET)
+                .arg("--message-format=json-render-diagnostics")
+                .args(&self.command.cargo_args);
+
+            command
+        };
+
+        let hints = try_parse_unit_graph(command()).ok();
+
+        let mut command = command();
         command
-            .env("RUSTFLAGS", rust_flags)
-            .env("TARGET_CC", "arm-vita-eabi-gcc")
-            .env("TARGET_CXX", "arm-vita-eabi-g++")
-            .pass_path_env("OPENSSL_LIB_DIR", || self.sdk("arm-vita-eabi").join("lib"))
-            .pass_path_env("OPENSSL_INCLUDE_DIR", || {
-                self.sdk("arm-vita-eabi").join("include")
-            })
-            .pass_path_env("PKG_CONFIG_PATH", || {
-                self.sdk("arm-vita-eabi").join("lib").join("pkgconfig")
-            })
-            .pass_env("PKG_CONFIG_SYSROOT_DIR", || &self.sdk)
-            .env("VITASDK", &self.sdk)
-            .arg("build")
-            .arg("-Z")
-            .arg(format!("build-std={}", meta.build_std))
-            .arg("--target")
-            .arg(VITA_TARGET)
-            .arg("--message-format")
-            .arg("json-render-diagnostics")
-            .args(&self.command.cargo_args)
             .stdin(Stdio::inherit())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
@@ -250,29 +260,49 @@ impl<'a> BuildContext<'a> {
         info!("{}: {command:?}", "Running cargo".blue());
 
         let mut process = command.spawn().context("Unable to spawn build process")?;
-        let command_stdout = process.stdout.take().context("Build failed")?;
-
-        let reader = if log::max_level() >= log::LevelFilter::Trace {
-            Either::Left(BufReader::new(TeeReader::new(command_stdout, io::stdout())))
+        let stdout = process.stdout.take().context("Build failed")?;
+        let stdout = if log::max_level() >= log::LevelFilter::Trace {
+            Either::Left(BufReader::new(TeeReader::new(stdout, io::stdout())))
         } else {
-            Either::Right(BufReader::new(command_stdout))
+            Either::Right(BufReader::new(stdout))
         };
 
-        let messages: Vec<Message> = Message::parse_stream(reader)
-            .collect::<io::Result<_>>()
-            .context("Unable to parse build stdout")?;
+        let message_stream = Message::parse_stream(stdout);
 
-        let artifacts = messages
-            .iter()
-            .rev()
-            .filter_map(|m| match m {
-                Message::CompilerArtifact(art) if art.executable.is_some() => Some(art.clone()),
-                _ => None,
-            })
-            .map(ExecutableArtifact::new)
-            .collect::<anyhow::Result<_>>()?;
+        let mut artifacts = Vec::new();
+
+        for message in message_stream {
+            match message.context("Unable to parse cargo output")? {
+                Message::CompilerArtifact(art) if art.executable.is_some() => {
+                    artifacts.push(ExecutableArtifact::new(art)?);
+                }
+                _ => {}
+            }
+        }
 
         if !process.wait_with_output()?.status.success() {
+            if let Some(hints) = hints {
+                if hints.strip_symbols() {
+                    warn!(
+                        "{warn}\n \
+                        Symbols in elf are required by `{velf}` to create a velf file.\n \
+                        Please remove `{strip_true}` or `{strip_symbols}` from your Cargo.toml.\n \
+                        If you want to optimize for the binary size, replace it \
+                        with `{strip_debug}` to strip debug section.\n \
+                        If you want to strip the symbol data from the resulting \
+                        binary, set `{strip_velf}` in `{vita_section}` \
+                        section of your Cargo.toml, this would strip the symbols from the velf.",
+                        warn = "Stripping symbols from ELF is unsupported.".yellow(),
+                        velf = "vita-elf-create".cyan(),
+                        strip_true = "strip=true".cyan(),
+                        strip_symbols = "strip=\"symbols\"".cyan(),
+                        strip_debug = "strip=\"debuginfo\"".cyan(),
+                        strip_velf = "strip_symbols = true".cyan(),
+                        vita_section = format!("[package.metadata.vita.{}]", hints.profile).cyan()
+                    );
+                }
+            }
+
             bail!("cargo build failed")
         }
 
@@ -280,21 +310,33 @@ impl<'a> BuildContext<'a> {
     }
 
     fn strip(&self, art: &ExecutableArtifact) -> anyhow::Result<()> {
-        if !art.meta.strip {
-            info!("{}", "Skipping elf strip".yellow());
+        // Try to guess if the elf was built with debug or release profile.
+        // This intentionally uses components() instead of as_str() to
+        // ensure that it works with operating systems that use a reverse slash for paths (Windows),
+        // as well as it works if the path is not normalized.
+        let profile = art
+            .elf
+            .components()
+            .skip_while(|s| s.as_str() != "armv7-sony-vita-newlibeabihf")
+            .nth(1);
+
+        let profile = profile.map_or("dev", |p| p.as_str());
+
+        if !art.meta.strip_symbols(profile) {
+            info!("{}", "Skipping additional elf strip".yellow());
             return Ok(());
         }
 
         let mut command = Command::new(self.sdk_binary("arm-vita-eabi-strip"));
 
         command
-            .args(&art.meta.vita_strip_flags)
+            .arg("--strip-unneeded")
             .arg(&art.elf)
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
 
-        info!("{}: {command:?}", "Stripping elf".blue());
+        info!("{}: {command:?}", "Stripping symbols from elf".blue());
 
         if !command.status()?.success() {
             bail!("arm-vita-eabi-strip failed");
