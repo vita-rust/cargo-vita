@@ -320,7 +320,12 @@ impl<'a> BuildContext<'a> {
             .skip_while(|s| s.as_str() != "armv7-sony-vita-newlibeabihf")
             .nth(1);
 
-        let profile = profile.map_or("dev", |p| p.as_str());
+        let mut profile = profile.map_or("dev", |p| p.as_str());
+
+        // Cargo uses "debug" folder for "dev" profile builds
+        if profile == "debug" {
+            profile = "dev";
+        }
 
         if !art.meta.strip_symbols(profile) {
             info!("{}", "Skipping additional elf strip".yellow());
