@@ -27,7 +27,7 @@ pub struct Build {
     #[command(subcommand)]
     cmd: BuildCmd,
 
-    /// An alphanumeric string of 9 characters. Used as a fallback in case title_id is not defined in Cargo.toml.
+    /// An alphanumeric string of 9 characters. Used as a fallback in case `title_id` is not defined in Cargo.toml.
     #[arg(long, env="VITA_DEFAULT_TITLE_ID", value_parser = clap::value_parser!(TitleId))]
     default_title_id: Option<TitleId>,
 
@@ -53,7 +53,7 @@ enum BuildCmd {
 
 #[derive(Args, Debug)]
 struct Eboot {
-    /// Uploads eboot.bin to ux0:app/{title_id}/eboot.bin
+    /// Uploads eboot.bin to `ux0:app/{title_id}/eboot.bin`
     #[arg(long, default_value = "false")]
     update: bool,
     /// Runs the updated app. If multiple eboot files are updated, only the last one is run.

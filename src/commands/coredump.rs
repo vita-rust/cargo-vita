@@ -89,19 +89,18 @@ impl Executor for Coredump {
                         tmp_file.to_path_buf()
                     };
 
-                    let elf = match &args.elf {
-                        Some(elf) => elf.clone(),
-                        None => {
-                            let (_, pkg, target_directory) = parse_crate_metadata(None)?;
-                            let pkg = pkg.context("Not in a crate")?;
+                    let elf = if let Some(elf) = &args.elf {
+                        elf.clone()
+                    } else {
+                        let (_, pkg, target_directory) = parse_crate_metadata(None)?;
+                        let pkg = pkg.context("Not in a crate")?;
 
-                            target_directory
-                                .join(VITA_TARGET)
-                                .join(&args.profile)
-                                .join(pkg.name)
-                                .with_extension("elf")
-                                .to_string()
-                        }
+                        target_directory
+                            .join(VITA_TARGET)
+                            .join(&args.profile)
+                            .join(pkg.name)
+                            .with_extension("elf")
+                            .to_string()
                     };
 
                     let mut command = Command::new("vita-parse-core");
