@@ -26,7 +26,7 @@ pub struct Logs {
 pub enum LogsCmd {
     /// Start a TCP server on 0.0.0.0 and print to stdout all bytes read from the socket
     Listen,
-    /// Reconfigures PrincessLog via vitacompanion.
+    /// Reconfigures `PrincessLog` via vitacompanion.
     /// This will upload the configuration file with the ip address of your host and a port to your Vita.
     Configure(Configure),
 }

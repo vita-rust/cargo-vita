@@ -43,9 +43,8 @@ pub fn set_cargo_config_env() -> anyhow::Result<()> {
             serde_json::from_reader(stdout)
                 .context("failed to deserialize `cargo config get` output")
         })
-        .map_err(|e| {
+        .inspect_err(|_| {
             let _ = child.kill();
-            e
         })?;
 
     let status = child.wait().context("running `cargo config get` command")?;
