@@ -233,9 +233,7 @@ impl<'a> BuildContext<'a> {
                 .pass_path_env("OPENSSL_INCLUDE_DIR", || {
                     self.sdk("arm-vita-eabi").join("include")
                 })
-                .pass_path_env("PKG_CONFIG_PATH", || {
-                    self.sdk("arm-vita-eabi").join("lib").join("pkgconfig")
-                })
+                .pass_path_env("PKG_CONFIG", || self.sdk_binary("arm-vita-eabi-pkg-config"))
                 .pass_env("PKG_CONFIG_SYSROOT_DIR", || &self.sdk)
                 .env("VITASDK", &self.sdk)
                 .arg("build")
