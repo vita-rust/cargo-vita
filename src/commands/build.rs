@@ -234,7 +234,6 @@ impl BuildContext<'_> {
                     self.sdk("arm-vita-eabi").join("include")
                 })
                 .pass_path_env("PKG_CONFIG", || self.sdk_binary("arm-vita-eabi-pkg-config"))
-                .pass_env("PKG_CONFIG_SYSROOT_DIR", || &self.sdk)
                 .env("VITASDK", &self.sdk)
                 .arg("build")
                 .arg("-Z")
