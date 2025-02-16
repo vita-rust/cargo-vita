@@ -205,7 +205,7 @@ impl Executor for Build {
     }
 }
 
-impl<'a> BuildContext<'a> {
+impl BuildContext<'_> {
     fn build_elf(&self) -> anyhow::Result<Vec<ExecutableArtifact>> {
         let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
 
@@ -233,10 +233,7 @@ impl<'a> BuildContext<'a> {
                 .pass_path_env("OPENSSL_INCLUDE_DIR", || {
                     self.sdk("arm-vita-eabi").join("include")
                 })
-                .pass_path_env("PKG_CONFIG_PATH", || {
-                    self.sdk("arm-vita-eabi").join("lib").join("pkgconfig")
-                })
-                .pass_env("PKG_CONFIG_SYSROOT_DIR", || &self.sdk)
+                .pass_path_env("PKG_CONFIG", || self.sdk_binary("arm-vita-eabi-pkg-config"))
                 .env("VITASDK", &self.sdk)
                 .arg("build")
                 .arg("-Z")
