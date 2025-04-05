@@ -166,6 +166,6 @@ impl Executor for Coredump {
 fn find_core_dumps(files: &[String]) -> impl Iterator<Item = &str> {
     files
         .iter()
-        .filter_map(|line| line.split(' ').last())
+        .filter_map(|line| line.split(' ').next_back())
         .filter(|file| file.starts_with("psp2core-") && file.ends_with(".bin.psp2dmp"))
 }

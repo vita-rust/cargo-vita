@@ -107,7 +107,7 @@ impl Executor for Upload {
                                     "Unable to create directory ".red()
                                 );
                             }
-                        };
+                        }
                     }
                 }
             }
