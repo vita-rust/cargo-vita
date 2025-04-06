@@ -139,7 +139,7 @@ impl Logs {
                     Err(err) => {
                         warn!("{}: {err}", "Failed to parse existing config".red());
                     }
-                };
+                }
             }
             Err(err) => {
                 warn!("{}: {err}", "Failed to download existing config".red());
