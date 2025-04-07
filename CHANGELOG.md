@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2025-04-05
+### Details
+#### Changed
+- Improved `strip` config handling (#22) by @nikarh in #22
+- Clippy fixes (#27) by @nikarh in #27
+- Bump EmbarkStudios/cargo-deny-action from 1 to 2 (#24) by @dependabot[bot] in #24
+- Bump peter-evans/create-pull-request from 6 to 7 (#26) by @dependabot[bot] in #26
+- Use vitasdk's pkg-config wrapper so that VITASDK variable gets set (#28) by @pheki in #28
+
+#### Fixed
+- Cargo uses debug folder for dev profile builds (#23) by @nikarh in #23
+
+
 ## [0.2.1] - 2024-04-02
 ### Details
 #### Changed
