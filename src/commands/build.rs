@@ -199,7 +199,7 @@ impl Executor for Build {
                     ctx.run(&artifacts, &args.eboot.connection.clone().required()?)?;
                 }
             }
-        };
+        }
 
         Ok(())
     }
