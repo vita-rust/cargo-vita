@@ -19,7 +19,7 @@ jobs:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Extract version from PR title
         id: tag
         run: echo "${{ github.event.pull_request.title }}" | awk '{print "name="  $2}' >> "$GITHUB_OUTPUT"
